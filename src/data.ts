@@ -1,12 +1,18 @@
-import type { Expense, InstallmentPlan, CategoryRules, MonthlySummary, ExpenseItem, SplitType, Person } from './types';
+import type { Expense, InstallmentPlan, RecurringExpense, CategoryRules, MonthlySummary, ExpenseItem, SplitType, Person } from './types';
 
 const KEYS = {
   expenses: 'orc_expenses',
   installments: 'orc_installments',
   categoryRules: 'orc_category_rules',
+  recurring: 'orc_recurring',
 } as const;
 
-export const CATEGORIES = ['Moradia', 'Alimentação', 'Lazer', 'Assinaturas', 'Pets', 'Outros'] as const;
+const DEFAULT_RECURRING: RecurringExpense[] = [
+  { id: 'fixed_moradia', description: 'Moradia', payer: 'barbara', startDate: '2026-01-01', value: 1300, category: 'Moradia', splitType: 'barbara', createdAt: '2026-01-01T00:00:00.000Z' },
+  { id: 'fixed_saude', description: 'Plano de Saúde', payer: 'barbara', startDate: '2026-01-01', value: 700, category: 'Saúde', splitType: 'barbara', createdAt: '2026-01-01T00:00:00.000Z' },
+];
+
+export const CATEGORIES = ['Moradia', 'Alimentação', 'Lazer', 'Assinaturas', 'Pets', 'Saúde', 'Outros'] as const;
 
 export const CAT_COLORS: Record<string, string> = {
   Moradia: '#5B8DB8',
@@ -14,6 +20,7 @@ export const CAT_COLORS: Record<string, string> = {
   Lazer: '#8B5FB5',
   Assinaturas: '#3A8A7A',
   Pets: '#6A9E6A',
+  Saúde: '#D4707A',
   Outros: '#9E7070',
 };
 
@@ -23,6 +30,7 @@ export const DEFAULT_RULES: CategoryRules = {
   Lazer: '50/50',
   Assinaturas: '50/50',
   Pets: '50/50',
+  Saúde: '50/50',
   Outros: '50/50',
 };
 
@@ -89,6 +97,30 @@ export function deleteInstallment(id: string) {
   save(KEYS.installments, getInstallments().filter(p => p.id !== id));
 }
 
+// ── Recurring Expenses ────────────────────────────────────────────────────
+
+export function getRecurringExpenses(): RecurringExpense[] {
+  const stored = load<RecurringExpense[] | null>(KEYS.recurring, null);
+  if (stored === null) return DEFAULT_RECURRING;
+  return stored;
+}
+
+export function addRecurringExpense(r: Omit<RecurringExpense, 'id' | 'createdAt'>): RecurringExpense {
+  const list = getRecurringExpenses();
+  const newR: RecurringExpense = { ...r, id: uuid(), createdAt: new Date().toISOString() };
+  save(KEYS.recurring, [...list, newR]);
+  return newR;
+}
+
+export function deleteRecurringExpense(id: string) {
+  const list = getRecurringExpenses();
+  save(KEYS.recurring, list.filter(r => r.id !== id));
+}
+
+export function updateRecurringExpense(id: string, patch: Partial<RecurringExpense>) {
+  save(KEYS.recurring, getRecurringExpenses().map(r => (r.id === id ? { ...r, ...patch } : r)));
+}
+
 // ── Category Rules ────────────────────────────────────────────────────────
 
 export function getCategoryRules(): CategoryRules {
@@ -121,8 +153,8 @@ export function monthDiff(a: string, b: string): number {
 
 export function parseSplit(splitType: SplitType): [number, number] {
   if (!splitType) return [50, 50];
-  if (splitType === 'barbara') return [100, 0];
-  if (splitType === 'felipe') return [0, 100];
+  if (splitType === 'barbara') return [0, 100];
+  if (splitType === 'felipe') return [100, 0];
   const m = splitType.match(/^(\d+)\/(\d+)$/);
   if (m) return [parseInt(m[1]), parseInt(m[2])];
   return [50, 50];
@@ -132,6 +164,23 @@ export function parseSplit(splitType: SplitType): [number, number] {
 
 export function computeMonth(yearMonth: string): MonthlySummary {
   const expenses = getExpenses().filter(e => toYM(e.date) === yearMonth);
+
+  const recurringItems: ExpenseItem[] = [];
+  getRecurringExpenses().forEach(r => {
+    if (yearMonth >= toYM(r.startDate)) {
+      recurringItems.push({
+        id: r.id + '_' + yearMonth,
+        description: r.description,
+        payer: r.payer,
+        date: yearMonth + '-01',
+        value: r.value,
+        category: r.category,
+        splitType: r.splitType,
+        source: 'recurring',
+        createdAt: r.createdAt,
+      });
+    }
+  });
 
   const installmentItems: ExpenseItem[] = [];
   getInstallments().forEach(plan => {
@@ -154,7 +203,7 @@ export function computeMonth(yearMonth: string): MonthlySummary {
     }
   });
 
-  return computeSummary([...expenses, ...installmentItems]);
+  return computeSummary([...recurringItems, ...expenses, ...installmentItems]);
 }
 
 export function computeSummary(items: ExpenseItem[]): MonthlySummary {

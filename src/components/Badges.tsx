@@ -36,6 +36,19 @@ export function SplitBadge({ splitType }: { splitType: SplitType }) {
   );
 }
 
+export function RecurringBadge() {
+  return (
+    <span style={{
+      display: 'inline-block', borderRadius: 100,
+      background: '#FFF3CD', color: '#9A6B00',
+      fontWeight: 600, fontSize: 10, padding: '2px 7px',
+      letterSpacing: '0.03em',
+    }}>
+      ↻ Fixo
+    </span>
+  );
+}
+
 export function CatBadge({ cat }: { cat: string }) {
   const color = CAT_COLORS[cat] || '#888';
   return (

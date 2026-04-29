@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Card, SectionLabel, Btn } from '../components/Primitives';
-import { CATEGORIES, CAT_COLORS, getCategoryRules, setCategoryRules, parseSplit } from '../data';
+import { PersonBadge } from '../components/Badges';
+import { CATEGORIES, CAT_COLORS, getCategoryRules, setCategoryRules, parseSplit, getRecurringExpenses, deleteRecurringExpense, fmt, fmtDate } from '../data';
 import type { CategoryRules } from '../types';
 
 interface SettingsViewProps {
@@ -9,6 +10,7 @@ interface SettingsViewProps {
 
 export function SettingsView({ onDataChange }: SettingsViewProps) {
   const [rules, setRules] = useState<CategoryRules>(getCategoryRules());
+  const [recurring, setRecurring] = useState(() => getRecurringExpenses());
   const [customInputs, setCustomInputs] = useState<Record<string, { b: string; f: string }>>(() => {
     const r = getCategoryRules();
     const out: Record<string, { b: string; f: string }> = {};
@@ -58,11 +60,20 @@ export function SettingsView({ onDataChange }: SettingsViewProps) {
     onDataChange();
   }
 
+  function handleDeleteRecurring(id: string) {
+    if (confirm('Remover este gasto fixo mensal?')) {
+      deleteRecurringExpense(id);
+      setRecurring(getRecurringExpenses());
+      onDataChange();
+    }
+  }
+
   function clearAll() {
     if (confirm('Apagar TODOS os dados? Esta ação não pode ser desfeita.')) {
       localStorage.removeItem('orc_expenses');
       localStorage.removeItem('orc_installments');
       localStorage.removeItem('orc_category_rules');
+      localStorage.removeItem('orc_recurring');
       window.location.reload();
     }
   }
@@ -134,6 +145,36 @@ export function SettingsView({ onDataChange }: SettingsViewProps) {
               </div>
             );
           })}
+        </div>
+      </Card>
+
+      <Card style={{ marginBottom: 16 }}>
+        <SectionLabel>Gastos fixos mensais</SectionLabel>
+        <div style={{ fontSize: 13, color: 'var(--orc-text-2)', marginBottom: 16 }}>
+          Aparecem automaticamente em todos os meses a partir da data de início.
+        </div>
+        {recurring.length === 0 && (
+          <div style={{ fontSize: 13, color: 'var(--orc-text-3)' }}>Nenhum gasto fixo cadastrado.</div>
+        )}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
+          {recurring.map((r, i) => (
+            <div key={r.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 0', borderBottom: i < recurring.length - 1 ? '1px solid var(--orc-border)' : 'none' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                <span style={{ fontWeight: 600, fontSize: 14 }}>{r.description}</span>
+                <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                  <PersonBadge person={r.payer} />
+                  <span style={{ fontSize: 12, color: 'var(--orc-text-3)' }}>{r.category}</span>
+                  <span style={{ fontSize: 12, color: 'var(--orc-text-3)' }}>desde {fmtDate(r.startDate)}</span>
+                </div>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                <span style={{ fontWeight: 700, fontSize: 15 }}>{fmt(r.value)}<span style={{ fontSize: 11, fontWeight: 400, color: 'var(--orc-text-3)' }}>/mês</span></span>
+                <button onClick={() => handleDeleteRecurring(r.id)}
+                  style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--orc-text-3)', fontSize: 18, lineHeight: 1 }}
+                  title="Remover">×</button>
+              </div>
+            </div>
+          ))}
         </div>
       </Card>
 

@@ -1,16 +1,18 @@
 import { Card, SectionLabel } from '../components/Primitives';
-import { PersonBadge, CatBadge, SplitBadge } from '../components/Badges';
+import { PersonBadge, CatBadge, SplitBadge, RecurringBadge } from '../components/Badges';
 import { DonutChart } from '../components/Charts';
-import { CATEGORIES, CAT_COLORS, fmt, fmtDate } from '../data';
+import { CATEGORIES, CAT_COLORS, fmt, fmtDate, addMonthsToYM, fmtMonth } from '../data';
 import type { MonthlySummary } from '../types';
 
 interface DashboardViewProps {
   summary: MonthlySummary;
   onAddExpense: () => void;
+  month: string;
 }
 
-export function DashboardView({ summary }: DashboardViewProps) {
+export function DashboardView({ summary, month }: DashboardViewProps) {
   const { barbaraPaid, felipePaid, barbaraOwes, felipeOwes, barbaraBalance, felipeBalance, owes, byCategory, total } = summary;
+  const nextMonth = fmtMonth(addMonthsToYM(month, 1));
 
   const catData = CATEGORIES
     .filter(c => byCategory[c] && byCategory[c].total > 0)
@@ -30,11 +32,16 @@ export function DashboardView({ summary }: DashboardViewProps) {
               <div style={{ fontWeight: 700, fontSize: 22, color: 'var(--orc-green)' }}>✓ Estão quites!</div>
             )}
             {hasData && owes && (
-              <div style={{ fontWeight: 700, fontSize: 22 }}>
-                <PersonBadge person={owes.from} size="lg" />{' '}deve pagar{' '}
-                <span style={{ color: 'var(--orc-green)' }}>{fmt(owes.amount)}</span>{' '}para{' '}
-                <PersonBadge person={owes.to} size="lg" />
-              </div>
+              <>
+                <div style={{ fontWeight: 700, fontSize: 22 }}>
+                  <PersonBadge person={owes.from} size="lg" />{' '}deve pagar{' '}
+                  <span style={{ color: 'var(--orc-green)' }}>{fmt(owes.amount)}</span>{' '}para{' '}
+                  <PersonBadge person={owes.to} size="lg" />
+                </div>
+                <div style={{ marginTop: 6, fontSize: 13, color: 'var(--orc-text-3)' }}>
+                  Pagamento no início de <strong style={{ color: 'var(--orc-text-2)' }}>{nextMonth}</strong>
+                </div>
+              </>
             )}
           </div>
           <div style={{ textAlign: 'right' }}>
@@ -153,7 +160,10 @@ export function DashboardView({ summary }: DashboardViewProps) {
                     onMouseLeave={e => (e.currentTarget.querySelectorAll('td').forEach(td => (td.style.background = '')))}>
                     <td style={{ padding: '10px 16px', fontSize: 13, color: 'var(--orc-text-2)', whiteSpace: 'nowrap' }}>{fmtDate(item.date)}</td>
                     <td style={{ padding: '10px 16px', fontSize: 14, fontWeight: 500, maxWidth: 200 }}>
-                      <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.description}</div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, overflow: 'hidden' }}>
+                        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.description}</span>
+                        {item.source === 'recurring' && <RecurringBadge />}
+                      </div>
                       {item.source === 'installment' && <div style={{ fontSize: 11, color: 'var(--orc-text-3)' }}>Parcelado</div>}
                       {item.source === 'csv' && <div style={{ fontSize: 11, color: 'var(--orc-text-3)' }}>CSV</div>}
                     </td>

@@ -1,9 +1,9 @@
 import { useState } from 'react';
 import { Card, Btn, EmptyState } from '../components/Primitives';
-import { PersonBadge, CatBadge, SplitBadge } from '../components/Badges';
+import { PersonBadge, CatBadge, SplitBadge, RecurringBadge } from '../components/Badges';
 import { AddExpenseModal } from '../components/AddExpenseModal';
-import { computeMonth, getCategoryRules, CATEGORIES, addInstallment, addExpense, deleteExpense, deleteInstallment, fmt, fmtDate } from '../data';
-import type { Person } from '../types';
+import { computeMonth, getCategoryRules, CATEGORIES, addInstallment, addExpense, updateExpense, deleteExpense, deleteInstallment, fmt, fmtDate } from '../data';
+import type { ExpenseItem, Person } from '../types';
 
 interface ExpensesViewProps {
   month: string;
@@ -12,6 +12,7 @@ interface ExpensesViewProps {
 
 export function ExpensesView({ month, onDataChange }: ExpensesViewProps) {
   const [showAdd, setShowAdd] = useState(false);
+  const [editingItem, setEditingItem] = useState<ExpenseItem | null>(null);
   const [filterPerson, setFilterPerson] = useState<'all' | Person>('all');
   const [filterCat, setFilterCat] = useState('all');
   const rules = getCategoryRules();
@@ -23,8 +24,14 @@ export function ExpensesView({ month, onDataChange }: ExpensesViewProps) {
   );
 
   function handleSave(type: 'installment' | 'expense', data: Record<string, unknown>) {
-    if (type === 'installment') addInstallment(data as Parameters<typeof addInstallment>[0]);
-    else addExpense(data as Parameters<typeof addExpense>[0]);
+    if (editingItem) {
+      updateExpense(editingItem.id, data as Parameters<typeof updateExpense>[1]);
+      setEditingItem(null);
+    } else if (type === 'installment') {
+      addInstallment(data as Parameters<typeof addInstallment>[0]);
+    } else {
+      addExpense(data as Parameters<typeof addExpense>[0]);
+    }
     onDataChange();
   }
 
@@ -80,7 +87,7 @@ export function ExpensesView({ month, onDataChange }: ExpensesViewProps) {
               <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                 <thead>
                   <tr style={{ background: 'var(--orc-bg)' }}>
-                    {['Data', 'Descrição', 'Quem pagou', 'Categoria', 'Divisão', 'Valor', ''].map(h => (
+                    {['Data', 'Descrição', 'Quem pagou', 'Categoria', 'Divisão', 'Valor', '', ''].map(h => (
                       <th key={h} style={{ fontSize: 11, fontWeight: 700, color: 'var(--orc-text-3)', textAlign: 'left', padding: '9px 16px', textTransform: 'uppercase', letterSpacing: '0.07em', whiteSpace: 'nowrap' }}>{h}</th>
                     ))}
                   </tr>
@@ -92,14 +99,24 @@ export function ExpensesView({ month, onDataChange }: ExpensesViewProps) {
                       onMouseLeave={e => e.currentTarget.querySelectorAll('td').forEach(td => (td.style.background = ''))}>
                       <td style={{ padding: '10px 16px', fontSize: 13, color: 'var(--orc-text-2)', whiteSpace: 'nowrap' }}>{fmtDate(item.date)}</td>
                       <td style={{ padding: '10px 16px', fontSize: 14, fontWeight: 500 }}>
-                        {item.description}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                          {item.description}
+                          {item.source === 'recurring' && <RecurringBadge />}
+                        </div>
                         {item.source === 'installment' && <div style={{ fontSize: 11, color: 'var(--orc-text-3)' }}>Parcelado</div>}
-                        {item.source === 'csv' && <span style={{ fontSize: 11, color: 'var(--orc-text-3)', marginLeft: 6 }}>CSV</span>}
+                        {item.source === 'csv' && <span style={{ fontSize: 11, color: 'var(--orc-text-3)' }}>CSV</span>}
                       </td>
                       <td style={{ padding: '10px 16px' }}><PersonBadge person={item.payer} /></td>
                       <td style={{ padding: '10px 16px' }}><CatBadge cat={item.category} /></td>
                       <td style={{ padding: '10px 16px' }}><SplitBadge splitType={item.splitType} /></td>
                       <td style={{ padding: '10px 16px', fontSize: 14, fontWeight: 700, textAlign: 'right', whiteSpace: 'nowrap' }}>{fmt(item.value)}</td>
+                      <td style={{ padding: '10px 16px' }}>
+                        {item.source !== 'installment' && (
+                          <button onClick={() => setEditingItem(item)}
+                            style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--orc-text-3)', fontSize: 14, lineHeight: 1 }}
+                            title="Editar">✎</button>
+                        )}
+                      </td>
                       <td style={{ padding: '10px 16px' }}>
                         <button onClick={() => handleDelete(item)}
                           style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--orc-text-3)', fontSize: 16, lineHeight: 1 }}
@@ -113,7 +130,26 @@ export function ExpensesView({ month, onDataChange }: ExpensesViewProps) {
           </Card>
         )}
 
-      {showAdd && <AddExpenseModal onClose={() => setShowAdd(false)} onSave={handleSave} rules={rules} />}
+      {showAdd && (
+        <AddExpenseModal onClose={() => setShowAdd(false)} onSave={handleSave} rules={rules} />
+      )}
+
+      {editingItem && (
+        <AddExpenseModal
+          onClose={() => setEditingItem(null)}
+          onSave={handleSave}
+          rules={rules}
+          editMode
+          prefill={{
+            payer: editingItem.payer,
+            description: editingItem.description,
+            date: editingItem.date,
+            value: editingItem.value,
+            category: editingItem.category,
+            splitType: editingItem.splitType,
+          }}
+        />
+      )}
     </div>
   );
 }
