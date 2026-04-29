@@ -1,33 +1,42 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card, Btn, EmptyState } from '../components/Primitives';
 import { PersonBadge, CatBadge, SplitBadge } from '../components/Badges';
 import { AddExpenseModal } from '../components/AddExpenseModal';
-import { getInstallments, addInstallment, deleteInstallment, getCategoryRules, addMonthsToYM, fmt, fmtMonth } from '../data';
+import { getInstallments, addInstallment, deleteInstallment, getCategoryRules, addMonthsToYM, fmt, fmtMonth, DEFAULT_RULES } from '../data';
+import type { InstallmentPlan, CategoryRules } from '../types';
 
 interface InstallmentsViewProps {
   currentMonth: string;
   onDataChange: () => void;
+  tick: number;
 }
 
-export function InstallmentsView({ currentMonth, onDataChange }: InstallmentsViewProps) {
-  const plans = getInstallments();
+export function InstallmentsView({ currentMonth, onDataChange, tick }: InstallmentsViewProps) {
+  const [plans, setPlans] = useState<InstallmentPlan[]>([]);
+  const [rules, setRules] = useState<CategoryRules>(DEFAULT_RULES);
   const [showAdd, setShowAdd] = useState(false);
-  const rules = getCategoryRules();
 
-  function handleSave(type: 'installment' | 'expense', data: Record<string, unknown>) {
-    if (type === 'installment') addInstallment(data as Parameters<typeof addInstallment>[0]);
+  useEffect(() => {
+    Promise.all([getInstallments(), getCategoryRules()]).then(([ps, rs]) => {
+      setPlans(ps);
+      setRules(rs);
+    });
+  }, [tick]);
+
+  async function handleSave(type: 'installment' | 'expense', data: Record<string, unknown>) {
+    if (type === 'installment') await addInstallment(data as Parameters<typeof addInstallment>[0]);
     onDataChange();
     setShowAdd(false);
   }
 
-  function handleDelete(id: string) {
+  async function handleDelete(id: string) {
     if (confirm('Remover parcelamento? Ele será retirado de todos os meses.')) {
-      deleteInstallment(id);
+      await deleteInstallment(id);
       onDataChange();
     }
   }
 
-  function calcElapsed(plan: ReturnType<typeof getInstallments>[number]): number {
+  function calcElapsed(plan: InstallmentPlan): number {
     const start = plan.startDate.substring(0, 7);
     const end = addMonthsToYM(start, plan.installmentCount - 1);
     if (currentMonth >= start && currentMonth <= end) {

@@ -1,11 +1,12 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { Card, SectionLabel, FormRow, SegmentedControl, Btn } from '../components/Primitives';
-import { parseCSV, addExpenses, getCategoryRules, CATEGORIES, fmt, fmtDate } from '../data';
+import { parseCSV, addExpenses, getCategoryRules, CATEGORIES, fmt, fmtDate, DEFAULT_RULES } from '../data';
 import type { ParsedCSVRow } from '../data';
-import type { Person, SplitType } from '../types';
+import type { CategoryRules, Person, SplitType } from '../types';
 
 interface ImportViewProps {
   onDataChange: () => void;
+  tick: number;
 }
 
 interface EditableRow extends ParsedCSVRow {
@@ -13,13 +14,17 @@ interface EditableRow extends ParsedCSVRow {
   payer: Person;
 }
 
-export function ImportView({ onDataChange }: ImportViewProps) {
+export function ImportView({ onDataChange, tick: _tick }: ImportViewProps) {
   const [payer, setPayer] = useState<Person>('barbara');
   const [editedRows, setEditedRows] = useState<EditableRow[]>([]);
   const [importing, setImporting] = useState(false);
   const [done, setDone] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
-  const rules = getCategoryRules();
+  const [rules, setRules] = useState<CategoryRules>(DEFAULT_RULES);
+
+  useEffect(() => {
+    getCategoryRules().then(setRules);
+  }, []);
 
   function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -43,17 +48,15 @@ export function ImportView({ onDataChange }: ImportViewProps) {
     setEditedRows(rows => rows.map((r, idx) => idx === i ? { ...r, ...patch } : r));
   }
 
-  function handleImport() {
+  async function handleImport() {
     setImporting(true);
     const toImport = editedRows.filter(r => r.selected).map(({ selected, _raw, ...r }) => r);
-    addExpenses(toImport);
-    setTimeout(() => {
-      setImporting(false);
-      setDone(true);
-      setEditedRows([]);
-      if (fileRef.current) fileRef.current.value = '';
-      onDataChange();
-    }, 500);
+    await addExpenses(toImport);
+    setImporting(false);
+    setDone(true);
+    setEditedRows([]);
+    if (fileRef.current) fileRef.current.value = '';
+    onDataChange();
   }
 
   const selectedCount = editedRows.filter(r => r.selected).length;

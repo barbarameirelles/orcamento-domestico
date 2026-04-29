@@ -44,6 +44,7 @@ export interface ExpenseItem extends Omit<Expense, 'id'> {
   id: string;
   source: ExpenseSource;
   installmentPlanId?: string;
+  recurringId?: string;
 }
 
 export interface MonthlySummary {

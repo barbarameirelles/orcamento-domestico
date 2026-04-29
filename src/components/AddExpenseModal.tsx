@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Modal, FormRow, SegmentedControl, Btn } from './Primitives';
 import { CATEGORIES, parseSplit, fmt, fmtMonth, addMonthsToYM } from '../data';
 import type { CategoryRules, Person } from '../types';
@@ -7,7 +7,16 @@ interface AddExpenseModalProps {
   onClose: () => void;
   onSave: (type: 'installment' | 'expense', data: Record<string, unknown>) => void;
   rules: CategoryRules;
-  prefill?: { installments?: boolean; payer?: Person; description?: string; date?: string; value?: number; category?: string; splitType?: string };
+  prefill?: {
+    installments?: boolean;
+    payer?: Person;
+    description?: string;
+    date?: string;
+    value?: number;
+    category?: string;
+    splitType?: string;
+    installmentCount?: number;
+  };
   editMode?: boolean;
 }
 
@@ -18,16 +27,40 @@ export function AddExpenseModal({ onClose, onSave, rules, prefill, editMode }: A
   const [desc, setDesc] = useState(prefill?.description || '');
   const [date, setDate] = useState(prefill?.date || today);
   const [value, setValue] = useState(prefill?.value ? String(prefill.value) : '');
-  const [parcelas, setParcelas] = useState('2');
+  const [parcelas, setParcelas] = useState(prefill?.installmentCount ? String(prefill.installmentCount) : '2');
   const [cat, setCat] = useState(prefill?.category || 'Outros');
   const [split, setSplit] = useState(prefill?.splitType || rules['Outros'] || '50/50');
   const [customB, setCustomB] = useState('50');
   const [customF, setCustomF] = useState('50');
 
+  // Controla se o primeiro render já passou para não sobrescrever o prefill de split
+  const isMounted = useRef(false);
+
   const isCustom = split === 'custom';
   const effectiveSplit = isCustom ? `${customB}/${customF}` : split;
 
   useEffect(() => {
+    // Inicializa customB/customF com base no splitType do prefill
+    if (prefill?.splitType) {
+      const [b, f] = parseSplit(prefill.splitType);
+      setCustomB(String(b));
+      setCustomF(String(f));
+      if (prefill.splitType !== 'barbara' && prefill.splitType !== 'felipe' && prefill.splitType !== '50/50') {
+        setSplit('custom');
+      } else {
+        setSplit(prefill.splitType);
+      }
+    }
+    isMounted.current = false; // reset para que a próxima troca de categoria funcione
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    // Pula no primeiro render ao abrir o modal (preserva o prefill)
+    if (!isMounted.current) {
+      isMounted.current = true;
+      return;
+    }
     const rule = rules[cat] || '50/50';
     const [bPct, fPct] = parseSplit(rule);
     if (bPct !== 50 || fPct !== 50) {
@@ -54,9 +87,25 @@ export function AddExpenseModal({ onClose, onSave, rules, prefill, editMode }: A
     e.preventDefault();
     if (!desc.trim() || valNum <= 0 || !date) return;
     if (tipo === 'parcelado') {
-      onSave('installment', { description: desc, payer, startDate: date, totalValue: valNum, installmentCount: parcNum, category: cat, splitType: effectiveSplit });
+      onSave('installment', {
+        description: desc,
+        payer,
+        startDate: date,
+        totalValue: valNum,
+        installmentCount: parcNum,
+        category: cat,
+        splitType: effectiveSplit,
+      });
     } else {
-      onSave('expense', { description: desc, payer, date, value: valNum, category: cat, splitType: effectiveSplit, source: 'manual' });
+      onSave('expense', {
+        description: desc,
+        payer,
+        date,
+        value: valNum,
+        category: cat,
+        splitType: effectiveSplit,
+        source: 'manual',
+      });
     }
     onClose();
   }
@@ -76,6 +125,13 @@ export function AddExpenseModal({ onClose, onSave, rules, prefill, editMode }: A
     backgroundPosition: 'right 10px center',
     paddingRight: 28,
   };
+
+  // Calcula valor por pessoa para exibição no parcelado
+  const perPersonDisplay = (() => {
+    if (tipo !== 'parcelado' || perMonth <= 0) return null;
+    const [bPct, fPct] = parseSplit(effectiveSplit);
+    return { bVal: perMonth * bPct / 100, fVal: perMonth * fPct / 100 };
+  })();
 
   return (
     <Modal title={editMode ? 'Editar Lançamento' : 'Novo Lançamento'} onClose={onClose}>
@@ -113,6 +169,13 @@ export function AddExpenseModal({ onClose, onSave, rules, prefill, editMode }: A
             label="Nº de parcelas"
             hint={perMonth > 0 ? `${fmt(perMonth)}/mês · ${fmtMonth(startYM)} → ${fmtMonth(endYM)}` : ''}>
             <input type="number" min="2" max="96" value={parcelas} onChange={e => setParcelas(e.target.value)} style={inputStyle} />
+            {perPersonDisplay && (
+              <div style={{ fontSize: 12, color: 'var(--orc-text-3)', marginTop: 6, display: 'flex', gap: 14, flexWrap: 'wrap' }}>
+                <span>Parcela: <strong style={{ color: 'var(--orc-text-2)' }}>{fmt(perMonth)}</strong></span>
+                <span>Barbara: <strong style={{ color: 'var(--orc-barbara)' }}>{fmt(perPersonDisplay.bVal)}</strong></span>
+                <span>Felipe: <strong style={{ color: 'var(--orc-felipe)' }}>{fmt(perPersonDisplay.fVal)}</strong></span>
+              </div>
+            )}
           </FormRow>
         )}
 

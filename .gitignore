@@ -2,3 +2,8 @@ node_modules
 dist
 .DS_Store
 *.local
+.vercel
+
+# Variáveis de ambiente (não commitar)
+.env.local
+.env

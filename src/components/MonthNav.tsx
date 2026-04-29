@@ -1,3 +1,4 @@
+import { useState, useEffect } from 'react';
 import { getAvailableMonths, fmtMonth } from '../data';
 
 interface MonthNavProps {
@@ -6,7 +7,12 @@ interface MonthNavProps {
 }
 
 export function MonthNav({ month, onChange }: MonthNavProps) {
-  const months = getAvailableMonths();
+  const [months, setMonths] = useState<string[]>([month]);
+
+  useEffect(() => {
+    getAvailableMonths().then(setMonths);
+  }, [month]);
+
   const idx = months.indexOf(month);
 
   return (

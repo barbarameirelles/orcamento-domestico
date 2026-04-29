@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useEffect } from 'react';
 import { PersonBadge } from '../components/Badges';
 import { MonthNav } from '../components/MonthNav';
 import { Btn } from '../components/Primitives';
@@ -9,8 +9,8 @@ import { ImportView } from '../views/ImportView';
 import { InstallmentsView } from '../views/InstallmentsView';
 import { HistoryView } from '../views/HistoryView';
 import { SettingsView } from '../views/SettingsView';
-import { computeMonth, getCategoryRules, addInstallment, addExpense, currentYM, fmtMonth } from '../data';
-import type { NavTab } from '../types';
+import { computeMonth, getCategoryRules, addInstallment, addExpense, currentYM, fmtMonth, DEFAULT_RULES } from '../data';
+import type { NavTab, MonthlySummary, CategoryRules } from '../types';
 
 const NAV: { id: NavTab; label: string; icon: string }[] = [
   { id: 'resumo',     label: 'Resumo',        icon: '◉' },
@@ -35,9 +35,18 @@ export default function OrcamentoApp() {
   const [month, setMonth] = useState(currentYM());
   const [tick, setTick] = useState(0);
   const [addOpen, setAddOpen] = useState(false);
+  const [summary, setSummary] = useState<MonthlySummary | null>(null);
+  const [rules, setRules] = useState<CategoryRules>(DEFAULT_RULES);
+  const [loading, setLoading] = useState(true);
 
-  const summary = useMemo(() => computeMonth(month), [month, tick]);
-  const rules = useMemo(() => getCategoryRules(), [tick]);
+  useEffect(() => {
+    setLoading(true);
+    Promise.all([computeMonth(month), getCategoryRules()]).then(([s, r]) => {
+      setSummary(s);
+      setRules(r);
+      setLoading(false);
+    });
+  }, [month, tick]);
 
   function onDataChange() { setTick(t => t + 1); }
 
@@ -48,9 +57,9 @@ export default function OrcamentoApp() {
     setTab('resumo');
   }
 
-  function handleFABSave(type: 'installment' | 'expense', data: Record<string, unknown>) {
-    if (type === 'installment') addInstallment(data as Parameters<typeof addInstallment>[0]);
-    else addExpense(data as Parameters<typeof addExpense>[0]);
+  async function handleFABSave(type: 'installment' | 'expense', data: Record<string, unknown>) {
+    if (type === 'installment') await addInstallment(data as Parameters<typeof addInstallment>[0]);
+    else await addExpense(data as Parameters<typeof addExpense>[0]);
     onDataChange();
   }
 
@@ -154,12 +163,21 @@ export default function OrcamentoApp() {
           </header>
 
           <main className="orc-main-content" style={{ padding: '24px 28px', flex: 1, paddingBottom: 32 }}>
-            {tab === 'resumo'     && <DashboardView summary={summary} onAddExpense={() => setAddOpen(true)} month={month} />}
-            {tab === 'gastos'     && <ExpensesView month={month} onDataChange={onDataChange} />}
-            {tab === 'importar'   && <ImportView onDataChange={onDataChange} />}
-            {tab === 'parcelados' && <InstallmentsView currentMonth={month} onDataChange={onDataChange} />}
-            {tab === 'historico'  && <HistoryView currentMonth={month} onSelectMonth={handleSelectMonth} />}
-            {tab === 'config'     && <SettingsView onDataChange={onDataChange} />}
+            {loading && (
+              <div style={{ textAlign: 'center', padding: '60px 0', color: 'var(--orc-text-3)', fontSize: 14 }}>
+                Carregando…
+              </div>
+            )}
+            {!loading && summary && (
+              <>
+                {tab === 'resumo'     && <DashboardView summary={summary} onAddExpense={() => setAddOpen(true)} month={month} />}
+                {tab === 'gastos'     && <ExpensesView summary={summary} rules={rules} onDataChange={onDataChange} />}
+                {tab === 'importar'   && <ImportView onDataChange={onDataChange} tick={tick} />}
+                {tab === 'parcelados' && <InstallmentsView currentMonth={month} onDataChange={onDataChange} tick={tick} />}
+                {tab === 'historico'  && <HistoryView currentMonth={month} onSelectMonth={handleSelectMonth} tick={tick} />}
+                {tab === 'config'     && <SettingsView onDataChange={onDataChange} tick={tick} />}
+              </>
+            )}
           </main>
         </div>
 
@@ -187,7 +205,7 @@ export default function OrcamentoApp() {
         {addOpen && (
           <AddExpenseModal
             onClose={() => setAddOpen(false)}
-            onSave={(type, data) => { handleFABSave(type, data); setAddOpen(false); }}
+            onSave={async (type, data) => { await handleFABSave(type, data); setAddOpen(false); }}
             rules={rules} />
         )}
       </div>

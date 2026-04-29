@@ -1,25 +1,35 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card, SectionLabel, Btn } from '../components/Primitives';
 import { PersonBadge } from '../components/Badges';
-import { CATEGORIES, CAT_COLORS, getCategoryRules, setCategoryRules, parseSplit, getRecurringExpenses, deleteRecurringExpense, fmt, fmtDate } from '../data';
-import type { CategoryRules } from '../types';
+import { CATEGORIES, CAT_COLORS, getCategoryRules, setCategoryRules, parseSplit, getRecurringExpenses, deleteRecurringExpense, fmt, fmtDate, DEFAULT_RULES } from '../data';
+import type { CategoryRules, RecurringExpense } from '../types';
 
 interface SettingsViewProps {
   onDataChange: () => void;
+  tick: number;
 }
 
-export function SettingsView({ onDataChange }: SettingsViewProps) {
-  const [rules, setRules] = useState<CategoryRules>(getCategoryRules());
-  const [recurring, setRecurring] = useState(() => getRecurringExpenses());
+export function SettingsView({ onDataChange, tick }: SettingsViewProps) {
+  const [rules, setRules] = useState<CategoryRules>(DEFAULT_RULES);
+  const [recurring, setRecurring] = useState<RecurringExpense[]>([]);
   const [customInputs, setCustomInputs] = useState<Record<string, { b: string; f: string }>>(() => {
-    const r = getCategoryRules();
     const out: Record<string, { b: string; f: string }> = {};
-    CATEGORIES.forEach(cat => {
-      const [b, f] = parseSplit(r[cat] || '50/50');
-      out[cat] = { b: String(b), f: String(f) };
-    });
+    CATEGORIES.forEach(cat => { out[cat] = { b: '50', f: '50' }; });
     return out;
   });
+
+  useEffect(() => {
+    Promise.all([getCategoryRules(), getRecurringExpenses()]).then(([r, rc]) => {
+      setRules(r);
+      setRecurring(rc);
+      const ci: Record<string, { b: string; f: string }> = {};
+      CATEGORIES.forEach(cat => {
+        const [b, f] = parseSplit(r[cat] || '50/50');
+        ci[cat] = { b: String(b), f: String(f) };
+      });
+      setCustomInputs(ci);
+    });
+  }, [tick]);
 
   function getSplitMode(cat: string) {
     const v = rules[cat] || '50/50';
@@ -30,7 +40,7 @@ export function SettingsView({ onDataChange }: SettingsViewProps) {
     return 'custom';
   }
 
-  function updateMode(cat: string, mode: string) {
+  async function updateMode(cat: string, mode: string) {
     let val: string;
     if (mode === '50/50') val = '50/50';
     else if (mode === 'barbara') val = 'barbara';
@@ -41,11 +51,11 @@ export function SettingsView({ onDataChange }: SettingsViewProps) {
     }
     const updated = { ...rules, [cat]: val };
     setRules(updated);
-    setCategoryRules(updated);
+    await setCategoryRules(updated);
     onDataChange();
   }
 
-  function updateCustom(cat: string, field: 'b' | 'f', raw: string) {
+  async function updateCustom(cat: string, field: 'b' | 'f', raw: string) {
     const num = Math.min(100, Math.max(0, parseInt(raw) || 0));
     const other = 100 - num;
     const newCI = {
@@ -56,19 +66,20 @@ export function SettingsView({ onDataChange }: SettingsViewProps) {
     const val = `${newCI[cat].b}/${newCI[cat].f}`;
     const updated = { ...rules, [cat]: val };
     setRules(updated);
-    setCategoryRules(updated);
+    await setCategoryRules(updated);
     onDataChange();
   }
 
-  function handleDeleteRecurring(id: string) {
+  async function handleDeleteRecurring(id: string) {
     if (confirm('Remover este gasto fixo mensal?')) {
-      deleteRecurringExpense(id);
-      setRecurring(getRecurringExpenses());
+      await deleteRecurringExpense(id);
+      const updated = await getRecurringExpenses();
+      setRecurring(updated);
       onDataChange();
     }
   }
 
-  function clearAll() {
+  async function clearAll() {
     if (confirm('Apagar TODOS os dados? Esta ação não pode ser desfeita.')) {
       localStorage.removeItem('orc_expenses');
       localStorage.removeItem('orc_installments');

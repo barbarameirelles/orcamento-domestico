@@ -1,3 +1,4 @@
+import { supabase, isSupabaseEnabled } from './lib/supabase';
 import type { Expense, InstallmentPlan, RecurringExpense, CategoryRules, MonthlySummary, ExpenseItem, SplitType } from './types';
 
 const KEYS = {
@@ -34,6 +35,8 @@ export const DEFAULT_RULES: CategoryRules = {
   Outros: '50/50',
 };
 
+// ── localStorage helpers ──────────────────────────────────────────────────
+
 function load<T>(key: string, def: T): T {
   try {
     const v = localStorage.getItem(key);
@@ -51,84 +54,296 @@ function uuid(): string {
   return Math.random().toString(36).slice(2) + Date.now().toString(36);
 }
 
+// ── DB mappers ────────────────────────────────────────────────────────────
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function expenseFromDb(r: any): Expense {
+  return {
+    id: r.id,
+    description: r.description,
+    payer: r.payer,
+    date: r.date,
+    value: Number(r.value),
+    category: r.category,
+    splitType: r.split_type,
+    source: r.source,
+    createdAt: r.created_at,
+  };
+}
+
+function expenseToDb(e: Expense) {
+  return {
+    id: e.id,
+    description: e.description,
+    payer: e.payer,
+    date: e.date,
+    value: e.value,
+    category: e.category,
+    split_type: e.splitType,
+    source: e.source,
+    created_at: e.createdAt,
+  };
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function planFromDb(r: any): InstallmentPlan {
+  return {
+    id: r.id,
+    description: r.description,
+    payer: r.payer,
+    startDate: r.start_date,
+    totalValue: Number(r.total_value),
+    installmentCount: Number(r.installment_count),
+    valuePerInstallment: Number(r.value_per_installment),
+    category: r.category,
+    splitType: r.split_type,
+    createdAt: r.created_at,
+  };
+}
+
+function planToDb(p: InstallmentPlan) {
+  return {
+    id: p.id,
+    description: p.description,
+    payer: p.payer,
+    start_date: p.startDate,
+    total_value: p.totalValue,
+    installment_count: p.installmentCount,
+    value_per_installment: p.valuePerInstallment,
+    category: p.category,
+    split_type: p.splitType,
+    created_at: p.createdAt,
+  };
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function recurringFromDb(r: any): RecurringExpense {
+  return {
+    id: r.id,
+    description: r.description,
+    payer: r.payer,
+    startDate: r.start_date,
+    value: Number(r.value),
+    category: r.category,
+    splitType: r.split_type,
+    createdAt: r.created_at,
+  };
+}
+
+function recurringToDb(r: RecurringExpense) {
+  return {
+    id: r.id,
+    description: r.description,
+    payer: r.payer,
+    start_date: r.startDate,
+    value: r.value,
+    category: r.category,
+    split_type: r.splitType,
+    created_at: r.createdAt,
+  };
+}
+
 // ── Expenses ──────────────────────────────────────────────────────────────
 
-export function getExpenses(): Expense[] {
+export async function getExpenses(): Promise<Expense[]> {
+  if (isSupabaseEnabled) {
+    const { data, error } = await supabase!.from('expenses').select('*');
+    if (error) throw error;
+    return (data || []).map(expenseFromDb);
+  }
   return load<Expense[]>(KEYS.expenses, []);
 }
 
-export function addExpense(exp: Omit<Expense, 'id' | 'createdAt'>): Expense {
-  const expenses = getExpenses();
+export async function addExpense(exp: Omit<Expense, 'id' | 'createdAt'>): Promise<Expense> {
   const newExp: Expense = { ...exp, id: uuid(), createdAt: new Date().toISOString() };
-  save(KEYS.expenses, [...expenses, newExp]);
+  if (isSupabaseEnabled) {
+    const { error } = await supabase!.from('expenses').insert(expenseToDb(newExp));
+    if (error) throw error;
+  } else {
+    const expenses = load<Expense[]>(KEYS.expenses, []);
+    save(KEYS.expenses, [...expenses, newExp]);
+  }
   return newExp;
 }
 
-export function addExpenses(list: Omit<Expense, 'id' | 'createdAt'>[]): Expense[] {
-  const expenses = getExpenses();
+export async function addExpenses(list: Omit<Expense, 'id' | 'createdAt'>[]): Promise<Expense[]> {
   const newOnes = list.map(e => ({ ...e, id: uuid(), createdAt: new Date().toISOString() } as Expense));
-  save(KEYS.expenses, [...expenses, ...newOnes]);
+  if (isSupabaseEnabled) {
+    const { error } = await supabase!.from('expenses').insert(newOnes.map(expenseToDb));
+    if (error) throw error;
+  } else {
+    const expenses = load<Expense[]>(KEYS.expenses, []);
+    save(KEYS.expenses, [...expenses, ...newOnes]);
+  }
   return newOnes;
 }
 
-export function deleteExpense(id: string) {
-  save(KEYS.expenses, getExpenses().filter(e => e.id !== id));
+export async function deleteExpense(id: string): Promise<void> {
+  if (isSupabaseEnabled) {
+    const { error } = await supabase!.from('expenses').delete().eq('id', id);
+    if (error) throw error;
+  } else {
+    save(KEYS.expenses, load<Expense[]>(KEYS.expenses, []).filter(e => e.id !== id));
+  }
 }
 
-export function updateExpense(id: string, patch: Partial<Expense>) {
-  save(KEYS.expenses, getExpenses().map(e => (e.id === id ? { ...e, ...patch } : e)));
+export async function updateExpense(id: string, patch: Partial<Expense>): Promise<void> {
+  if (isSupabaseEnabled) {
+    const dbPatch: Record<string, unknown> = {};
+    if (patch.description !== undefined) dbPatch.description = patch.description;
+    if (patch.payer !== undefined) dbPatch.payer = patch.payer;
+    if (patch.date !== undefined) dbPatch.date = patch.date;
+    if (patch.value !== undefined) dbPatch.value = patch.value;
+    if (patch.category !== undefined) dbPatch.category = patch.category;
+    if (patch.splitType !== undefined) dbPatch.split_type = patch.splitType;
+    if (patch.source !== undefined) dbPatch.source = patch.source;
+    const { error } = await supabase!.from('expenses').update(dbPatch).eq('id', id);
+    if (error) throw error;
+  } else {
+    save(KEYS.expenses, load<Expense[]>(KEYS.expenses, []).map(e => (e.id === id ? { ...e, ...patch } : e)));
+  }
 }
 
 // ── Installment Plans ─────────────────────────────────────────────────────
 
-export function getInstallments(): InstallmentPlan[] {
+export async function getInstallments(): Promise<InstallmentPlan[]> {
+  if (isSupabaseEnabled) {
+    const { data, error } = await supabase!.from('installment_plans').select('*');
+    if (error) throw error;
+    return (data || []).map(planFromDb);
+  }
   return load<InstallmentPlan[]>(KEYS.installments, []);
 }
 
-export function addInstallment(plan: Omit<InstallmentPlan, 'id' | 'valuePerInstallment' | 'createdAt'>): InstallmentPlan {
-  const plans = getInstallments();
+export async function addInstallment(plan: Omit<InstallmentPlan, 'id' | 'valuePerInstallment' | 'createdAt'>): Promise<InstallmentPlan> {
   const vpi = parseFloat((plan.totalValue / plan.installmentCount).toFixed(2));
   const newPlan: InstallmentPlan = { ...plan, id: uuid(), valuePerInstallment: vpi, createdAt: new Date().toISOString() };
-  save(KEYS.installments, [...plans, newPlan]);
+  if (isSupabaseEnabled) {
+    const { error } = await supabase!.from('installment_plans').insert(planToDb(newPlan));
+    if (error) throw error;
+  } else {
+    const plans = load<InstallmentPlan[]>(KEYS.installments, []);
+    save(KEYS.installments, [...plans, newPlan]);
+  }
   return newPlan;
 }
 
-export function deleteInstallment(id: string) {
-  save(KEYS.installments, getInstallments().filter(p => p.id !== id));
+export async function updateInstallmentPlan(
+  id: string,
+  patch: Partial<Omit<InstallmentPlan, 'id' | 'createdAt'>>
+): Promise<void> {
+  if (isSupabaseEnabled) {
+    const dbPatch: Record<string, unknown> = {};
+    if (patch.description !== undefined) dbPatch.description = patch.description;
+    if (patch.payer !== undefined) dbPatch.payer = patch.payer;
+    if (patch.startDate !== undefined) dbPatch.start_date = patch.startDate;
+    if (patch.category !== undefined) dbPatch.category = patch.category;
+    if (patch.splitType !== undefined) dbPatch.split_type = patch.splitType;
+    if (patch.totalValue !== undefined || patch.installmentCount !== undefined) {
+      const { data } = await supabase!.from('installment_plans').select('total_value,installment_count').eq('id', id).single();
+      const tv = patch.totalValue ?? Number(data?.total_value);
+      const ic = patch.installmentCount ?? Number(data?.installment_count);
+      dbPatch.total_value = tv;
+      dbPatch.installment_count = ic;
+      dbPatch.value_per_installment = parseFloat((tv / ic).toFixed(2));
+    }
+    const { error } = await supabase!.from('installment_plans').update(dbPatch).eq('id', id);
+    if (error) throw error;
+  } else {
+    save(KEYS.installments, load<InstallmentPlan[]>(KEYS.installments, []).map(p => {
+      if (p.id !== id) return p;
+      const merged = { ...p, ...patch };
+      if (patch.totalValue !== undefined || patch.installmentCount !== undefined) {
+        merged.valuePerInstallment = parseFloat((merged.totalValue / merged.installmentCount).toFixed(2));
+      }
+      return merged;
+    }));
+  }
+}
+
+export async function deleteInstallment(id: string): Promise<void> {
+  if (isSupabaseEnabled) {
+    const { error } = await supabase!.from('installment_plans').delete().eq('id', id);
+    if (error) throw error;
+  } else {
+    save(KEYS.installments, load<InstallmentPlan[]>(KEYS.installments, []).filter(p => p.id !== id));
+  }
 }
 
 // ── Recurring Expenses ────────────────────────────────────────────────────
 
-export function getRecurringExpenses(): RecurringExpense[] {
+export async function getRecurringExpenses(): Promise<RecurringExpense[]> {
+  if (isSupabaseEnabled) {
+    const { data, error } = await supabase!.from('recurring_expenses').select('*');
+    if (error) throw error;
+    if (!data || data.length === 0) return DEFAULT_RECURRING;
+    return data.map(recurringFromDb);
+  }
   const stored = load<RecurringExpense[] | null>(KEYS.recurring, null);
   if (stored === null) return DEFAULT_RECURRING;
   return stored;
 }
 
-export function addRecurringExpense(r: Omit<RecurringExpense, 'id' | 'createdAt'>): RecurringExpense {
-  const list = getRecurringExpenses();
+export async function addRecurringExpense(r: Omit<RecurringExpense, 'id' | 'createdAt'>): Promise<RecurringExpense> {
   const newR: RecurringExpense = { ...r, id: uuid(), createdAt: new Date().toISOString() };
-  save(KEYS.recurring, [...list, newR]);
+  if (isSupabaseEnabled) {
+    const { error } = await supabase!.from('recurring_expenses').insert(recurringToDb(newR));
+    if (error) throw error;
+  } else {
+    const list = load<RecurringExpense[] | null>(KEYS.recurring, null) ?? DEFAULT_RECURRING;
+    save(KEYS.recurring, [...list, newR]);
+  }
   return newR;
 }
 
-export function deleteRecurringExpense(id: string) {
-  const list = getRecurringExpenses();
-  save(KEYS.recurring, list.filter(r => r.id !== id));
+export async function deleteRecurringExpense(id: string): Promise<void> {
+  if (isSupabaseEnabled) {
+    const { error } = await supabase!.from('recurring_expenses').delete().eq('id', id);
+    if (error) throw error;
+  } else {
+    const list = load<RecurringExpense[] | null>(KEYS.recurring, null) ?? DEFAULT_RECURRING;
+    save(KEYS.recurring, list.filter(r => r.id !== id));
+  }
 }
 
-export function updateRecurringExpense(id: string, patch: Partial<RecurringExpense>) {
-  save(KEYS.recurring, getRecurringExpenses().map(r => (r.id === id ? { ...r, ...patch } : r)));
+export async function updateRecurringExpense(id: string, patch: Partial<RecurringExpense>): Promise<void> {
+  if (isSupabaseEnabled) {
+    const dbPatch: Record<string, unknown> = {};
+    if (patch.description !== undefined) dbPatch.description = patch.description;
+    if (patch.payer !== undefined) dbPatch.payer = patch.payer;
+    if (patch.startDate !== undefined) dbPatch.start_date = patch.startDate;
+    if (patch.value !== undefined) dbPatch.value = patch.value;
+    if (patch.category !== undefined) dbPatch.category = patch.category;
+    if (patch.splitType !== undefined) dbPatch.split_type = patch.splitType;
+    const { error } = await supabase!.from('recurring_expenses').update(dbPatch).eq('id', id);
+    if (error) throw error;
+  } else {
+    const list = load<RecurringExpense[] | null>(KEYS.recurring, null) ?? DEFAULT_RECURRING;
+    save(KEYS.recurring, list.map(r => (r.id === id ? { ...r, ...patch } : r)));
+  }
 }
 
 // ── Category Rules ────────────────────────────────────────────────────────
 
-export function getCategoryRules(): CategoryRules {
+export async function getCategoryRules(): Promise<CategoryRules> {
+  if (isSupabaseEnabled) {
+    const { data, error } = await supabase!.from('category_rules').select('*');
+    if (error) throw error;
+    const rules: CategoryRules = { ...DEFAULT_RULES };
+    (data || []).forEach((r: { key: string; value: string }) => { rules[r.key] = r.value; });
+    return rules;
+  }
   return { ...DEFAULT_RULES, ...load<CategoryRules>(KEYS.categoryRules, {}) };
 }
 
-export function setCategoryRules(rules: CategoryRules) {
-  save(KEYS.categoryRules, rules);
+export async function setCategoryRules(rules: CategoryRules): Promise<void> {
+  if (isSupabaseEnabled) {
+    const rows = Object.entries(rules).map(([key, value]) => ({ key, value }));
+    const { error } = await supabase!.from('category_rules').upsert(rows, { onConflict: 'key' });
+    if (error) throw error;
+  } else {
+    save(KEYS.categoryRules, rules);
+  }
 }
 
 // ── Time Helpers ──────────────────────────────────────────────────────────
@@ -153,8 +368,8 @@ export function monthDiff(a: string, b: string): number {
 
 export function parseSplit(splitType: SplitType): [number, number] {
   if (!splitType) return [50, 50];
-  if (splitType === 'barbara') return [0, 100];
-  if (splitType === 'felipe') return [100, 0];
+  if (splitType === 'barbara') return [100, 0]; // Barbara arca com 100%, Felipe 0%
+  if (splitType === 'felipe') return [0, 100];  // Felipe arca com 100%, Barbara 0%
   const m = splitType.match(/^(\d+)\/(\d+)$/);
   if (m) return [parseInt(m[1]), parseInt(m[2])];
   return [50, 50];
@@ -162,14 +377,21 @@ export function parseSplit(splitType: SplitType): [number, number] {
 
 // ── Monthly Computation ───────────────────────────────────────────────────
 
-export function computeMonth(yearMonth: string): MonthlySummary {
-  const expenses = getExpenses().filter(e => toYM(e.date) === yearMonth);
+export async function computeMonth(yearMonth: string): Promise<MonthlySummary> {
+  const [expenses, recurringList, installmentList] = await Promise.all([
+    getExpenses(),
+    getRecurringExpenses(),
+    getInstallments(),
+  ]);
+
+  const monthExpenses = expenses.filter(e => toYM(e.date) === yearMonth);
 
   const recurringItems: ExpenseItem[] = [];
-  getRecurringExpenses().forEach(r => {
+  recurringList.forEach(r => {
     if (yearMonth >= toYM(r.startDate)) {
       recurringItems.push({
         id: r.id + '_' + yearMonth,
+        recurringId: r.id,
         description: r.description,
         payer: r.payer,
         date: yearMonth + '-01',
@@ -183,7 +405,7 @@ export function computeMonth(yearMonth: string): MonthlySummary {
   });
 
   const installmentItems: ExpenseItem[] = [];
-  getInstallments().forEach(plan => {
+  installmentList.forEach(plan => {
     const start = toYM(plan.startDate);
     const end = addMonthsToYM(start, plan.installmentCount - 1);
     if (yearMonth >= start && yearMonth <= end) {
@@ -203,7 +425,7 @@ export function computeMonth(yearMonth: string): MonthlySummary {
     }
   });
 
-  return computeSummary([...recurringItems, ...expenses, ...installmentItems]);
+  return computeSummary([...recurringItems, ...monthExpenses, ...installmentItems]);
 }
 
 export function computeSummary(items: ExpenseItem[]): MonthlySummary {
@@ -251,10 +473,11 @@ export function computeSummary(items: ExpenseItem[]): MonthlySummary {
   };
 }
 
-export function getAvailableMonths(): string[] {
+export async function getAvailableMonths(): Promise<string[]> {
+  const [expenses, installments] = await Promise.all([getExpenses(), getInstallments()]);
   const months = new Set<string>();
-  getExpenses().forEach(e => months.add(toYM(e.date)));
-  getInstallments().forEach(p => {
+  expenses.forEach(e => months.add(toYM(e.date)));
+  installments.forEach(p => {
     const start = toYM(p.startDate);
     for (let i = 0; i < p.installmentCount; i++) months.add(addMonthsToYM(start, i));
   });

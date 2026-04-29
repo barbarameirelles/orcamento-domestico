@@ -2,51 +2,93 @@ import { useState } from 'react';
 import { Card, Btn, EmptyState } from '../components/Primitives';
 import { PersonBadge, CatBadge, SplitBadge, RecurringBadge } from '../components/Badges';
 import { AddExpenseModal } from '../components/AddExpenseModal';
-import { computeMonth, getCategoryRules, CATEGORIES, addInstallment, addExpense, updateExpense, deleteExpense, deleteInstallment, fmt, fmtDate } from '../data';
-import type { ExpenseItem, Person } from '../types';
+import {
+  CATEGORIES, addInstallment, addExpense, updateExpense, updateInstallmentPlan,
+  updateRecurringExpense, deleteExpense, deleteInstallment, getInstallments,
+  fmt, fmtDate,
+} from '../data';
+import type { ExpenseItem, InstallmentPlan, MonthlySummary, Person, CategoryRules } from '../types';
 
 interface ExpensesViewProps {
-  month: string;
+  summary: MonthlySummary;
+  rules: CategoryRules;
   onDataChange: () => void;
 }
 
-export function ExpensesView({ month, onDataChange }: ExpensesViewProps) {
+export function ExpensesView({ summary, rules, onDataChange }: ExpensesViewProps) {
   const [showAdd, setShowAdd] = useState(false);
   const [editingItem, setEditingItem] = useState<ExpenseItem | null>(null);
+  const [editingPlan, setEditingPlan] = useState<InstallmentPlan | null>(null);
   const [filterPerson, setFilterPerson] = useState<'all' | Person>('all');
   const [filterCat, setFilterCat] = useState('all');
-  const rules = getCategoryRules();
 
-  const allItems = computeMonth(month).items;
+  const allItems = summary.items;
   const filtered = allItems.filter(e =>
     (filterPerson === 'all' || e.payer === filterPerson) &&
     (filterCat === 'all' || e.category === filterCat)
   );
 
-  function handleSave(type: 'installment' | 'expense', data: Record<string, unknown>) {
+  async function handleSave(type: 'installment' | 'expense', data: Record<string, unknown>) {
     if (editingItem) {
-      updateExpense(editingItem.id, data as Parameters<typeof updateExpense>[1]);
+      if (editingItem.source === 'recurring' && editingItem.recurringId) {
+        await updateRecurringExpense(editingItem.recurringId, {
+          description: data.description as string,
+          payer: data.payer as Person,
+          category: data.category as string,
+          splitType: data.splitType as string,
+          value: data.value as number,
+          startDate: (data.startDate ?? data.date) as string,
+        });
+      } else if (editingItem.source === 'installment' && editingItem.installmentPlanId) {
+        await updateInstallmentPlan(editingItem.installmentPlanId, {
+          description: data.description as string,
+          payer: data.payer as Person,
+          category: data.category as string,
+          splitType: data.splitType as string,
+          totalValue: data.value as number,
+          installmentCount: data.installmentCount as number,
+          startDate: (data.startDate ?? data.date) as string,
+        });
+      } else {
+        await updateExpense(editingItem.id, data as Parameters<typeof updateExpense>[1]);
+      }
       setEditingItem(null);
-    } else if (type === 'installment') {
-      addInstallment(data as Parameters<typeof addInstallment>[0]);
+      setEditingPlan(null);
+      onDataChange();
+      return;
+    }
+
+    if (type === 'installment') {
+      await addInstallment(data as Parameters<typeof addInstallment>[0]);
     } else {
-      addExpense(data as Parameters<typeof addExpense>[0]);
+      await addExpense(data as Parameters<typeof addExpense>[0]);
     }
     onDataChange();
   }
 
-  function handleDelete(item: typeof allItems[number]) {
+  async function handleDelete(item: ExpenseItem) {
     if (item.source === 'installment') {
       if (confirm('Este é um gasto parcelado. Deseja remover o parcelamento inteiro?')) {
-        deleteInstallment(item.installmentPlanId!);
+        await deleteInstallment(item.installmentPlanId!);
         onDataChange();
       }
     } else {
       if (confirm('Remover este lançamento?')) {
-        deleteExpense(item.id);
+        await deleteExpense(item.id);
         onDataChange();
       }
     }
+  }
+
+  async function handleEditClick(item: ExpenseItem) {
+    if (item.source === 'installment' && item.installmentPlanId) {
+      const plans = await getInstallments();
+      const plan = plans.find(p => p.id === item.installmentPlanId) ?? null;
+      setEditingPlan(plan);
+    } else {
+      setEditingPlan(null);
+    }
+    setEditingItem(item);
   }
 
   const selectStyle: React.CSSProperties = {
@@ -61,6 +103,30 @@ export function ExpensesView({ month, onDataChange }: ExpensesViewProps) {
   };
 
   const sorted = [...filtered].sort((a, b) => b.date.localeCompare(a.date));
+
+  function buildPrefill() {
+    if (!editingItem) return undefined;
+    if (editingItem.source === 'installment' && editingPlan) {
+      return {
+        installments: true,
+        payer: editingPlan.payer,
+        description: editingPlan.description,
+        date: editingPlan.startDate,
+        value: editingPlan.totalValue,
+        category: editingPlan.category,
+        splitType: editingPlan.splitType,
+        installmentCount: editingPlan.installmentCount,
+      };
+    }
+    return {
+      payer: editingItem.payer,
+      description: editingItem.description,
+      date: editingItem.date,
+      value: editingItem.value,
+      category: editingItem.category,
+      splitType: editingItem.splitType,
+    };
+  }
 
   return (
     <div>
@@ -111,11 +177,9 @@ export function ExpensesView({ month, onDataChange }: ExpensesViewProps) {
                       <td style={{ padding: '10px 16px' }}><SplitBadge splitType={item.splitType} /></td>
                       <td style={{ padding: '10px 16px', fontSize: 14, fontWeight: 700, textAlign: 'right', whiteSpace: 'nowrap' }}>{fmt(item.value)}</td>
                       <td style={{ padding: '10px 16px' }}>
-                        {item.source !== 'installment' && (
-                          <button onClick={() => setEditingItem(item)}
-                            style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--orc-text-3)', fontSize: 14, lineHeight: 1 }}
-                            title="Editar">✎</button>
-                        )}
+                        <button onClick={() => handleEditClick(item)}
+                          style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--orc-text-3)', fontSize: 14, lineHeight: 1 }}
+                          title="Editar">✎</button>
                       </td>
                       <td style={{ padding: '10px 16px' }}>
                         <button onClick={() => handleDelete(item)}
@@ -136,18 +200,11 @@ export function ExpensesView({ month, onDataChange }: ExpensesViewProps) {
 
       {editingItem && (
         <AddExpenseModal
-          onClose={() => setEditingItem(null)}
+          onClose={() => { setEditingItem(null); setEditingPlan(null); }}
           onSave={handleSave}
           rules={rules}
           editMode
-          prefill={{
-            payer: editingItem.payer,
-            description: editingItem.description,
-            date: editingItem.date,
-            value: editingItem.value,
-            category: editingItem.category,
-            splitType: editingItem.splitType,
-          }}
+          prefill={buildPrefill()}
         />
       )}
     </div>

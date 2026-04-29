@@ -1,20 +1,42 @@
+import { useState, useEffect } from 'react';
 import { Card } from '../components/Primitives';
 import { PersonBadge } from '../components/Badges';
 import { getAvailableMonths, computeMonth, fmt, fmtMonth } from '../data';
+import type { MonthlySummary } from '../types';
 
 interface HistoryViewProps {
   currentMonth: string;
   onSelectMonth: (ym: string) => void;
+  tick: number;
 }
 
-export function HistoryView({ currentMonth, onSelectMonth }: HistoryViewProps) {
-  const months = getAvailableMonths();
+export function HistoryView({ currentMonth, onSelectMonth, tick }: HistoryViewProps) {
+  const [months, setMonths] = useState<string[]>([]);
+  const [summaries, setSummaries] = useState<Record<string, MonthlySummary>>({});
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    setLoading(true);
+    getAvailableMonths().then(async ms => {
+      setMonths(ms);
+      const sums = await Promise.all(ms.map(ym => computeMonth(ym)));
+      const byMonth: Record<string, MonthlySummary> = {};
+      ms.forEach((ym, i) => { byMonth[ym] = sums[i]; });
+      setSummaries(byMonth);
+      setLoading(false);
+    });
+  }, [tick]);
+
+  if (loading) {
+    return <div style={{ textAlign: 'center', padding: '60px 0', color: 'var(--orc-text-3)', fontSize: 14 }}>Carregando…</div>;
+  }
 
   return (
     <div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
         {months.map(ym => {
-          const s = computeMonth(ym);
+          const s = summaries[ym];
+          if (!s) return null;
           const isCurrent = ym === currentMonth;
           return (
             <Card
