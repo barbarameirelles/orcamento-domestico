@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Modal, FormRow, SegmentedControl, Btn, OrcInput, OrcSelect } from './Primitives';
+import { Modal, FormRow, SegmentedControl, Btn } from './Primitives';
 import { CATEGORIES, parseSplit, fmt, fmtMonth, addMonthsToYM } from '../data';
 import type { CategoryRules, Person } from '../types';
 

@@ -1,4 +1,4 @@
-import type { Expense, InstallmentPlan, RecurringExpense, CategoryRules, MonthlySummary, ExpenseItem, SplitType, Person } from './types';
+import type { Expense, InstallmentPlan, RecurringExpense, CategoryRules, MonthlySummary, ExpenseItem, SplitType } from './types';
 
 const KEYS = {
   expenses: 'orc_expenses',
