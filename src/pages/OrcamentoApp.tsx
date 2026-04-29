@@ -154,7 +154,7 @@ export default function OrcamentoApp() {
           </header>
 
           <main className="orc-main-content" style={{ padding: '24px 28px', flex: 1, paddingBottom: 32 }}>
-            {tab === 'resumo'     && <DashboardView summary={summary} onAddExpense={() => setAddOpen(true)} />}
+            {tab === 'resumo'     && <DashboardView summary={summary} onAddExpense={() => setAddOpen(true)} month={month} />}
             {tab === 'gastos'     && <ExpensesView month={month} onDataChange={onDataChange} />}
             {tab === 'importar'   && <ImportView onDataChange={onDataChange} />}
             {tab === 'parcelados' && <InstallmentsView currentMonth={month} onDataChange={onDataChange} />}

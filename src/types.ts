@@ -1,6 +1,6 @@
 export type Person = 'barbara' | 'felipe';
 export type SplitType = '50/50' | 'barbara' | 'felipe' | string;
-export type ExpenseSource = 'manual' | 'csv' | 'installment';
+export type ExpenseSource = 'manual' | 'csv' | 'installment' | 'recurring';
 
 export interface Expense {
   id: string;
@@ -22,6 +22,17 @@ export interface InstallmentPlan {
   totalValue: number;
   installmentCount: number;
   valuePerInstallment: number;
+  category: string;
+  splitType: SplitType;
+  createdAt: string;
+}
+
+export interface RecurringExpense {
+  id: string;
+  description: string;
+  payer: Person;
+  startDate: string; // YYYY-MM-DD
+  value: number;
   category: string;
   splitType: SplitType;
   createdAt: string;

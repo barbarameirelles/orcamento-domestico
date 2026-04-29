@@ -8,9 +8,10 @@ interface AddExpenseModalProps {
   onSave: (type: 'installment' | 'expense', data: Record<string, unknown>) => void;
   rules: CategoryRules;
   prefill?: { installments?: boolean; payer?: Person; description?: string; date?: string; value?: number; category?: string; splitType?: string };
+  editMode?: boolean;
 }
 
-export function AddExpenseModal({ onClose, onSave, rules, prefill }: AddExpenseModalProps) {
+export function AddExpenseModal({ onClose, onSave, rules, prefill, editMode }: AddExpenseModalProps) {
   const today = new Date().toISOString().slice(0, 10);
   const [tipo, setTipo] = useState(prefill?.installments ? 'parcelado' : 'unico');
   const [payer, setPayer] = useState<Person>(prefill?.payer || 'barbara');
@@ -77,7 +78,7 @@ export function AddExpenseModal({ onClose, onSave, rules, prefill }: AddExpenseM
   };
 
   return (
-    <Modal title="Novo Lançamento" onClose={onClose}>
+    <Modal title={editMode ? 'Editar Lançamento' : 'Novo Lançamento'} onClose={onClose}>
       <form onSubmit={handleSubmit}>
         <FormRow label="Tipo">
           <SegmentedControl
