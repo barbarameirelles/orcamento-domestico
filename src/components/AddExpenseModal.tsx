@@ -112,6 +112,9 @@ export function AddExpenseModal({ onClose, onSave, rules, prefill, editMode }: A
         });
       }
       onClose();
+    } catch (err) {
+      console.error('[AddExpenseModal] Erro ao salvar:', err);
+      alert('Erro ao salvar: ' + (err instanceof Error ? err.message : JSON.stringify(err)));
     } finally {
       setIsSubmitting(false);
     }

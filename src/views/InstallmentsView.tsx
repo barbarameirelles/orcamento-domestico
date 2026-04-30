@@ -24,9 +24,14 @@ export function InstallmentsView({ currentMonth, onDataChange, tick }: Installme
   }, [tick]);
 
   async function handleSave(type: 'installment' | 'expense', data: Record<string, unknown>) {
-    if (type === 'installment') await addInstallment(data as Parameters<typeof addInstallment>[0]);
-    onDataChange();
-    setShowAdd(false);
+    try {
+      if (type === 'installment') await addInstallment(data as Parameters<typeof addInstallment>[0]);
+      onDataChange();
+      setShowAdd(false);
+    } catch (err) {
+      console.error('[InstallmentsView] Erro ao salvar:', err);
+      alert('Erro ao salvar: ' + (err instanceof Error ? err.message : JSON.stringify(err)));
+    }
   }
 
   async function handleDelete(id: string) {
