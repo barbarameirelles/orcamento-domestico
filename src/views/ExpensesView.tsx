@@ -29,41 +29,46 @@ export function ExpensesView({ summary, rules, onDataChange }: ExpensesViewProps
   );
 
   async function handleSave(type: 'installment' | 'expense', data: Record<string, unknown>) {
-    if (editingItem) {
-      if (editingItem.source === 'recurring' && editingItem.recurringId) {
-        await updateRecurringExpense(editingItem.recurringId, {
-          description: data.description as string,
-          payer: data.payer as Person,
-          category: data.category as string,
-          splitType: data.splitType as string,
-          value: data.value as number,
-          startDate: (data.startDate ?? data.date) as string,
-        });
-      } else if (editingItem.source === 'installment' && editingItem.installmentPlanId) {
-        await updateInstallmentPlan(editingItem.installmentPlanId, {
-          description: data.description as string,
-          payer: data.payer as Person,
-          category: data.category as string,
-          splitType: data.splitType as string,
-          totalValue: (data.totalValue ?? data.value) as number,
-          installmentCount: data.installmentCount as number,
-          startDate: (data.startDate ?? data.date) as string,
-        });
-      } else {
-        await updateExpense(editingItem.id, data as Parameters<typeof updateExpense>[1]);
+    try {
+      if (editingItem) {
+        if (editingItem.source === 'recurring' && editingItem.recurringId) {
+          await updateRecurringExpense(editingItem.recurringId, {
+            description: data.description as string,
+            payer: data.payer as Person,
+            category: data.category as string,
+            splitType: data.splitType as string,
+            value: data.value as number,
+            startDate: (data.startDate ?? data.date) as string,
+          });
+        } else if (editingItem.source === 'installment' && editingItem.installmentPlanId) {
+          await updateInstallmentPlan(editingItem.installmentPlanId, {
+            description: data.description as string,
+            payer: data.payer as Person,
+            category: data.category as string,
+            splitType: data.splitType as string,
+            totalValue: (data.totalValue ?? data.value) as number,
+            installmentCount: data.installmentCount as number,
+            startDate: (data.startDate ?? data.date) as string,
+          });
+        } else {
+          await updateExpense(editingItem.id, data as Parameters<typeof updateExpense>[1]);
+        }
+        setEditingItem(null);
+        setEditingPlan(null);
+        onDataChange();
+        return;
       }
-      setEditingItem(null);
-      setEditingPlan(null);
-      onDataChange();
-      return;
-    }
 
-    if (type === 'installment') {
-      await addInstallment(data as Parameters<typeof addInstallment>[0]);
-    } else {
-      await addExpense(data as Parameters<typeof addExpense>[0]);
+      if (type === 'installment') {
+        await addInstallment(data as Parameters<typeof addInstallment>[0]);
+      } else {
+        await addExpense(data as Parameters<typeof addExpense>[0]);
+      }
+      onDataChange();
+    } catch (err) {
+      console.error('[ExpensesView] Erro ao salvar:', err);
+      alert('Erro ao salvar: ' + (err instanceof Error ? err.message : JSON.stringify(err)));
     }
-    onDataChange();
   }
 
   async function handleDelete(item: ExpenseItem) {

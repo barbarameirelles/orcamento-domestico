@@ -210,7 +210,7 @@ export default function OrcamentoApp() {
         {addOpen && (
           <AddExpenseModal
             onClose={() => setAddOpen(false)}
-            onSave={async (type, data) => { await handleFABSave(type, data); setAddOpen(false); }}
+            onSave={handleFABSave}
             rules={rules} />
         )}
       </div>

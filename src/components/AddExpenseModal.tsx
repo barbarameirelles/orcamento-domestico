@@ -5,7 +5,7 @@ import type { CategoryRules, Person } from '../types';
 
 interface AddExpenseModalProps {
   onClose: () => void;
-  onSave: (type: 'installment' | 'expense', data: Record<string, unknown>) => void;
+  onSave: (type: 'installment' | 'expense', data: Record<string, unknown>) => Promise<void> | void;
   rules: CategoryRules;
   prefill?: {
     installments?: boolean;
@@ -83,11 +83,11 @@ export function AddExpenseModal({ onClose, onSave, rules, prefill, editMode }: A
   const startYM = date ? date.substring(0, 7) : '';
   const endYM = startYM ? addMonthsToYM(startYM, parcNum - 1) : '';
 
-  function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!desc.trim() || valNum <= 0 || !date) return;
     if (tipo === 'parcelado') {
-      onSave('installment', {
+      await onSave('installment', {
         description: desc,
         payer,
         startDate: date,
@@ -97,7 +97,7 @@ export function AddExpenseModal({ onClose, onSave, rules, prefill, editMode }: A
         splitType: effectiveSplit,
       });
     } else {
-      onSave('expense', {
+      await onSave('expense', {
         description: desc,
         payer,
         date,
