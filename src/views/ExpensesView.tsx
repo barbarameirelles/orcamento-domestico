@@ -5,7 +5,7 @@ import { AddExpenseModal } from '../components/AddExpenseModal';
 import {
   CATEGORIES, addInstallment, addExpense, updateExpense, updateInstallmentPlan,
   updateRecurringExpense, deleteExpense, deleteInstallment, getInstallments,
-  fmt, fmtDate,
+  fmt, fmtDate, parseSplit,
 } from '../data';
 import type { ExpenseItem, InstallmentPlan, MonthlySummary, Person, CategoryRules } from '../types';
 
@@ -180,7 +180,22 @@ export function ExpensesView({ summary, rules, onDataChange }: ExpensesViewProps
                       <td style={{ padding: '10px 16px' }}><PersonBadge person={item.payer} /></td>
                       <td style={{ padding: '10px 16px' }}><CatBadge cat={item.category} /></td>
                       <td style={{ padding: '10px 16px' }}><SplitBadge splitType={item.splitType} /></td>
-                      <td style={{ padding: '10px 16px', fontSize: 14, fontWeight: 700, textAlign: 'right', whiteSpace: 'nowrap' }}>{fmt(item.value)}</td>
+                      <td style={{ padding: '10px 16px', textAlign: 'right', whiteSpace: 'nowrap' }}>
+                        <div style={{ fontSize: 14, fontWeight: 700 }}>{fmt(item.value)}</div>
+                        {(() => {
+                          const [bPct, fPct] = parseSplit(item.splitType);
+                          if (bPct === 0 || fPct === 0) return null; // 100% de um só: badge já é claro
+                          const bVal = item.value * bPct / 100;
+                          const fVal = item.value * fPct / 100;
+                          return (
+                            <div style={{ fontSize: 11, marginTop: 2 }}>
+                              <span style={{ color: 'var(--orc-barbara)' }}>{fmt(bVal)}</span>
+                              {' / '}
+                              <span style={{ color: 'var(--orc-felipe)' }}>{fmt(fVal)}</span>
+                            </div>
+                          );
+                        })()}
+                      </td>
                       <td style={{ padding: '10px 16px' }}>
                         <button onClick={() => handleEditClick(item)}
                           style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--orc-text-3)', fontSize: 14, lineHeight: 1 }}
