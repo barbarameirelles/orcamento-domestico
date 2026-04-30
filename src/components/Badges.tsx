@@ -20,9 +20,9 @@ export function SplitBadge({ splitType }: { splitType: SplitType }) {
   const [bPct, fPct] = parseSplit(splitType);
   let label: string, bg: string, color: string;
   if (bPct === 100) {
-    label = 'Barbara'; bg = 'var(--orc-barbara-light)'; color = 'var(--orc-barbara)';
+    label = 'Só Barbara'; bg = 'var(--orc-barbara-light)'; color = 'var(--orc-barbara)';
   } else if (fPct === 100) {
-    label = 'Felipe'; bg = 'var(--orc-felipe-light)'; color = 'var(--orc-felipe)';
+    label = 'Só Felipe'; bg = 'var(--orc-felipe-light)'; color = 'var(--orc-felipe)';
   } else {
     label = `${bPct}/${fPct}`; bg = '#E8F4FF'; color = '#3A7BC8';
   }

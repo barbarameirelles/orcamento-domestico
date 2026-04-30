@@ -158,7 +158,7 @@ export function ExpensesView({ summary, rules, onDataChange }: ExpensesViewProps
               <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                 <thead>
                   <tr style={{ background: 'var(--orc-bg)' }}>
-                    {['Data', 'Descrição', 'Quem pagou', 'Categoria', 'Divisão', 'Valor', '', ''].map(h => (
+                    {['Data', 'Descrição', 'Quem pagou', 'Categoria', 'Quem arca', 'Valor', '', ''].map(h => (
                       <th key={h} style={{ fontSize: 11, fontWeight: 700, color: 'var(--orc-text-3)', textAlign: 'left', padding: '9px 16px', textTransform: 'uppercase', letterSpacing: '0.07em', whiteSpace: 'nowrap' }}>{h}</th>
                     ))}
                   </tr>
