@@ -276,7 +276,14 @@ export async function getRecurringExpenses(): Promise<RecurringExpense[]> {
   if (isSupabaseEnabled) {
     const { data, error } = await supabase!.from('recurring_expenses').select('*');
     if (error) throw error;
-    if (!data || data.length === 0) return DEFAULT_RECURRING;
+    if (!data || data.length === 0) {
+      // Semeia os defaults no banco para que edições futuras funcionem
+      const { error: seedError } = await supabase!
+        .from('recurring_expenses')
+        .upsert(DEFAULT_RECURRING.map(recurringToDb), { onConflict: 'id' });
+      if (seedError) console.warn('Seed recurring failed:', seedError);
+      return DEFAULT_RECURRING;
+    }
     return data.map(recurringFromDb);
   }
   const stored = load<RecurringExpense[] | null>(KEYS.recurring, null);
@@ -308,14 +315,11 @@ export async function deleteRecurringExpense(id: string): Promise<void> {
 
 export async function updateRecurringExpense(id: string, patch: Partial<RecurringExpense>): Promise<void> {
   if (isSupabaseEnabled) {
-    const dbPatch: Record<string, unknown> = {};
-    if (patch.description !== undefined) dbPatch.description = patch.description;
-    if (patch.payer !== undefined) dbPatch.payer = patch.payer;
-    if (patch.startDate !== undefined) dbPatch.start_date = patch.startDate;
-    if (patch.value !== undefined) dbPatch.value = patch.value;
-    if (patch.category !== undefined) dbPatch.category = patch.category;
-    if (patch.splitType !== undefined) dbPatch.split_type = patch.splitType;
-    const { error } = await supabase!.from('recurring_expenses').update(dbPatch).eq('id', id);
+    // Busca o registro atual (pode ser um default que ainda não está no banco)
+    const { data: existing } = await supabase!.from('recurring_expenses').select('*').eq('id', id).single();
+    const base: RecurringExpense = existing ? recurringFromDb(existing) : (DEFAULT_RECURRING.find(r => r.id === id) ?? DEFAULT_RECURRING[0]);
+    const merged = { ...base, ...patch };
+    const { error } = await supabase!.from('recurring_expenses').upsert(recurringToDb(merged), { onConflict: 'id' });
     if (error) throw error;
   } else {
     const list = load<RecurringExpense[] | null>(KEYS.recurring, null) ?? DEFAULT_RECURRING;
