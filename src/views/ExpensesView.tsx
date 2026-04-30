@@ -45,7 +45,7 @@ export function ExpensesView({ summary, rules, onDataChange }: ExpensesViewProps
           payer: data.payer as Person,
           category: data.category as string,
           splitType: data.splitType as string,
-          totalValue: data.value as number,
+          totalValue: (data.totalValue ?? data.value) as number,
           installmentCount: data.installmentCount as number,
           startDate: (data.startDate ?? data.date) as string,
         });
