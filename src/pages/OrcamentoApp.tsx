@@ -58,9 +58,14 @@ export default function OrcamentoApp() {
   }
 
   async function handleFABSave(type: 'installment' | 'expense', data: Record<string, unknown>) {
-    if (type === 'installment') await addInstallment(data as Parameters<typeof addInstallment>[0]);
-    else await addExpense(data as Parameters<typeof addExpense>[0]);
-    onDataChange();
+    try {
+      if (type === 'installment') await addInstallment(data as Parameters<typeof addInstallment>[0]);
+      else await addExpense(data as Parameters<typeof addExpense>[0]);
+      onDataChange();
+    } catch (err) {
+      console.error('[Salvar] Erro ao salvar no Supabase:', err);
+      alert('Erro ao salvar: ' + (err instanceof Error ? err.message : JSON.stringify(err)));
+    }
   }
 
   const showMonthNav = tab === 'resumo' || tab === 'gastos';
