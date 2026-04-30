@@ -379,6 +379,14 @@ export function parseSplit(splitType: SplitType): [number, number] {
   return [50, 50];
 }
 
+export function computeItemDebt(item: { value: number; splitType: SplitType; payer: 'barbara' | 'felipe' }): { debtor: 'barbara' | 'felipe'; amount: number } {
+  const [bPct, fPct] = parseSplit(item.splitType);
+  if (item.payer === 'barbara') {
+    return { debtor: 'felipe', amount: item.value * fPct / 100 };
+  }
+  return { debtor: 'barbara', amount: item.value * bPct / 100 };
+}
+
 // ── Monthly Computation ───────────────────────────────────────────────────
 
 export async function computeMonth(yearMonth: string): Promise<MonthlySummary> {

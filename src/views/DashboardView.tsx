@@ -1,7 +1,7 @@
 import { Card, SectionLabel } from '../components/Primitives';
 import { PersonBadge, CatBadge, SplitBadge, RecurringBadge } from '../components/Badges';
 import { DonutChart } from '../components/Charts';
-import { CATEGORIES, CAT_COLORS, fmt, fmtDate, addMonthsToYM, fmtMonth } from '../data';
+import { CATEGORIES, CAT_COLORS, fmt, fmtDate, addMonthsToYM, fmtMonth, computeItemDebt } from '../data';
 import type { MonthlySummary } from '../types';
 
 interface DashboardViewProps {
@@ -148,7 +148,7 @@ export function DashboardView({ summary, month }: DashboardViewProps) {
             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
               <thead>
                 <tr style={{ background: 'var(--orc-bg)' }}>
-                  {['Data', 'Descrição', 'Quem pagou', 'Categoria', 'Divisão', 'Valor'].map(h => (
+                  {['Data', 'Descrição', 'Quem pagou', 'Categoria', 'Divisão', 'Valor', 'Acerto'].map(h => (
                     <th key={h} style={{ fontSize: 11, fontWeight: 700, color: 'var(--orc-text-3)', textAlign: 'left', padding: '9px 16px', textTransform: 'uppercase', letterSpacing: '0.07em', whiteSpace: 'nowrap' }}>{h}</th>
                   ))}
                 </tr>
@@ -171,6 +171,20 @@ export function DashboardView({ summary, month }: DashboardViewProps) {
                     <td style={{ padding: '10px 16px' }}><CatBadge cat={item.category} /></td>
                     <td style={{ padding: '10px 16px' }}><SplitBadge splitType={item.splitType} /></td>
                     <td style={{ padding: '10px 16px', fontSize: 14, fontWeight: 700, textAlign: 'right', whiteSpace: 'nowrap' }}>{fmt(item.value)}</td>
+                    <td style={{ padding: '10px 16px', whiteSpace: 'nowrap' }}>
+                      {(() => {
+                        const debt = computeItemDebt(item);
+                        if (debt.amount < 0.01) {
+                          return <span style={{ fontSize: 12, color: 'var(--orc-text-3)' }}>—</span>;
+                        }
+                        return (
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                            <PersonBadge person={debt.debtor} />
+                            <span style={{ fontSize: 13, fontWeight: 600 }}>{fmt(debt.amount)}</span>
+                          </div>
+                        );
+                      })()}
+                    </td>
                   </tr>
                 ))}
               </tbody>
