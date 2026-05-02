@@ -15,12 +15,25 @@ interface ExpensesViewProps {
   onDataChange: () => void;
 }
 
+type SortKey = 'date' | 'description' | 'payer' | 'category' | 'splitType' | 'value' | 'debt';
+
 export function ExpensesView({ summary, rules, onDataChange }: ExpensesViewProps) {
   const [editingItem, setEditingItem] = useState<ExpenseItem | null>(null);
   const [editingPlan, setEditingPlan] = useState<InstallmentPlan | null>(null);
   const [filterPerson, setFilterPerson] = useState<'all' | Person>('all');
   const [filterCat, setFilterCat] = useState('all');
   const [filterSource, setFilterSource] = useState<'all' | ExpenseSource>('all');
+  const [sortKey, setSortKey] = useState<SortKey>('date');
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
+
+  function toggleSort(key: SortKey) {
+    if (sortKey === key) {
+      setSortDir(d => (d === 'asc' ? 'desc' : 'asc'));
+    } else {
+      setSortKey(key);
+      setSortDir(key === 'date' || key === 'value' || key === 'debt' ? 'desc' : 'asc');
+    }
+  }
 
   const allItems = summary.items;
   const filtered = allItems.filter(e =>
@@ -108,7 +121,27 @@ export function ExpensesView({ summary, rules, onDataChange }: ExpensesViewProps
     paddingRight: 28,
   };
 
-  const sorted = [...filtered].sort((a, b) => b.date.localeCompare(a.date));
+  const sorted = [...filtered].sort((a, b) => {
+    const dir = sortDir === 'asc' ? 1 : -1;
+    switch (sortKey) {
+      case 'date':
+        return dir * a.date.localeCompare(b.date);
+      case 'description':
+        return dir * a.description.localeCompare(b.description, 'pt-BR');
+      case 'payer':
+        return dir * a.payer.localeCompare(b.payer);
+      case 'category':
+        return dir * a.category.localeCompare(b.category, 'pt-BR');
+      case 'splitType':
+        return dir * a.splitType.localeCompare(b.splitType);
+      case 'value':
+        return dir * (a.value - b.value);
+      case 'debt':
+        return dir * (computeItemDebt(a).amount - computeItemDebt(b).amount);
+      default:
+        return 0;
+    }
+  });
 
   function buildPrefill() {
     if (!editingItem) return undefined;
@@ -153,6 +186,24 @@ export function ExpensesView({ summary, rules, onDataChange }: ExpensesViewProps
           <option value="installment">Parcelado</option>
           <option value="recurring">Fixo</option>
         </select>
+        <select
+          className="orc-only-mobile"
+          value={`${sortKey}:${sortDir}`}
+          onChange={e => {
+            const [k, d] = e.target.value.split(':') as [SortKey, 'asc' | 'desc'];
+            setSortKey(k); setSortDir(d);
+          }}
+          style={selectStyle}>
+          <option value="date:desc">Data ↓</option>
+          <option value="date:asc">Data ↑</option>
+          <option value="value:desc">Valor ↓</option>
+          <option value="value:asc">Valor ↑</option>
+          <option value="debt:desc">Acerto ↓</option>
+          <option value="debt:asc">Acerto ↑</option>
+          <option value="description:asc">Descrição A→Z</option>
+          <option value="description:desc">Descrição Z→A</option>
+          <option value="category:asc">Categoria A→Z</option>
+        </select>
       </div>
 
       {sorted.length === 0
@@ -163,9 +214,33 @@ export function ExpensesView({ summary, rules, onDataChange }: ExpensesViewProps
               <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                 <thead>
                   <tr style={{ background: 'var(--orc-bg)' }}>
-                    {['Data', 'Descrição', 'Quem pagou', 'Categoria', 'Quem arca', 'Valor', 'Acerto', '', ''].map(h => (
-                      <th key={h} style={{ fontSize: 11, fontWeight: 700, color: 'var(--orc-text-3)', textAlign: 'left', padding: '9px 16px', textTransform: 'uppercase', letterSpacing: '0.07em', whiteSpace: 'nowrap' }}>{h}</th>
-                    ))}
+                    {([
+                      ['Data', 'date'],
+                      ['Descrição', 'description'],
+                      ['Quem pagou', 'payer'],
+                      ['Categoria', 'category'],
+                      ['Quem arca', 'splitType'],
+                      ['Valor', 'value'],
+                      ['Acerto', 'debt'],
+                    ] as [string, SortKey][]).map(([label, key]) => {
+                      const active = sortKey === key;
+                      const arrow = active ? (sortDir === 'asc' ? '↑' : '↓') : '';
+                      return (
+                        <th key={key}
+                          onClick={() => toggleSort(key)}
+                          style={{
+                            fontSize: 11, fontWeight: 700,
+                            color: active ? 'var(--orc-text)' : 'var(--orc-text-3)',
+                            textAlign: 'left', padding: '9px 16px', textTransform: 'uppercase',
+                            letterSpacing: '0.07em', whiteSpace: 'nowrap',
+                            cursor: 'pointer', userSelect: 'none',
+                          }}>
+                          {label}{arrow && <span style={{ marginLeft: 4 }}>{arrow}</span>}
+                        </th>
+                      );
+                    })}
+                    <th style={{ padding: '9px 16px' }}></th>
+                    <th style={{ padding: '9px 16px' }}></th>
                   </tr>
                 </thead>
                 <tbody>
