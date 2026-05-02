@@ -49,6 +49,19 @@ export function RecurringBadge() {
   );
 }
 
+export function CSVBadge() {
+  return (
+    <span style={{
+      display: 'inline-block', borderRadius: 100,
+      background: '#E8E0F5', color: '#6A4FB5',
+      fontWeight: 600, fontSize: 10, padding: '2px 7px',
+      letterSpacing: '0.03em',
+    }}>
+      ▭ Cartão
+    </span>
+  );
+}
+
 export function CatBadge({ cat }: { cat: string }) {
   const color = CAT_COLORS[cat] || '#888';
   return (

@@ -1,8 +1,8 @@
 import { useState, useRef, useEffect } from 'react';
 import { Card, SectionLabel, FormRow, SegmentedControl, Btn } from '../components/Primitives';
-import { parseCSV, addExpenses, getCategoryRules, CATEGORIES, fmt, fmtDate, DEFAULT_RULES } from '../data';
+import { parseCSV, addExpenses, CATEGORIES, fmt, fmtDate } from '../data';
 import type { ParsedCSVRow } from '../data';
-import type { CategoryRules, Person, SplitType } from '../types';
+import type { Person, SplitType } from '../types';
 
 interface ImportViewProps {
   onDataChange: () => void;
@@ -20,11 +20,6 @@ export function ImportView({ onDataChange, tick: _tick }: ImportViewProps) {
   const [importing, setImporting] = useState(false);
   const [done, setDone] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
-  const [rules, setRules] = useState<CategoryRules>(DEFAULT_RULES);
-
-  useEffect(() => {
-    getCategoryRules().then(setRules);
-  }, []);
 
   function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -35,7 +30,7 @@ export function ImportView({ onDataChange, tick: _tick }: ImportViewProps) {
       const withDefaults = parsed.map(r => ({
         ...r,
         payer,
-        splitType: rules[r.category] || '50/50',
+        splitType: 'barbara' as SplitType,
         selected: true,
       }));
       setEditedRows(withDefaults);
@@ -43,6 +38,10 @@ export function ImportView({ onDataChange, tick: _tick }: ImportViewProps) {
     };
     reader.readAsText(file, 'UTF-8');
   }
+
+  useEffect(() => {
+    setEditedRows(rows => rows.map(r => ({ ...r, payer })));
+  }, [payer]);
 
   function updateRow(i: number, patch: Partial<EditableRow>) {
     setEditedRows(rows => rows.map((r, idx) => idx === i ? { ...r, ...patch } : r));
@@ -60,6 +59,8 @@ export function ImportView({ onDataChange, tick: _tick }: ImportViewProps) {
   }
 
   const selectedCount = editedRows.filter(r => r.selected).length;
+  const totalAll = editedRows.reduce((s, r) => s + r.value, 0);
+  const totalSelected = editedRows.filter(r => r.selected).reduce((s, r) => s + r.value, 0);
 
   const selectStyle: React.CSSProperties = {
     fontSize: 12, padding: '4px 8px', borderRadius: 6,
@@ -113,6 +114,12 @@ export function ImportView({ onDataChange, tick: _tick }: ImportViewProps) {
               <div style={{ fontSize: 13, color: 'var(--orc-text-2)' }}>
                 {editedRows.length} itens encontrados · {selectedCount} selecionados
               </div>
+              <div style={{ fontSize: 13, color: 'var(--orc-text-2)', marginTop: 2 }}>
+                Total da fatura: <strong style={{ color: 'var(--orc-text)' }}>{fmt(totalAll)}</strong>
+                {selectedCount !== editedRows.length && (
+                  <> · Selecionado: <strong style={{ color: 'var(--orc-text)' }}>{fmt(totalSelected)}</strong></>
+                )}
+              </div>
             </div>
             <Btn onClick={handleImport} disabled={selectedCount === 0 || importing}>
               {importing ? 'Importando…' : `Importar ${selectedCount} lançamentos`}
@@ -149,7 +156,7 @@ export function ImportView({ onDataChange, tick: _tick }: ImportViewProps) {
                     <td style={{ padding: '8px 12px', fontSize: 13, fontWeight: 700, whiteSpace: 'nowrap' }}>{fmt(row.value)}</td>
                     <td style={{ padding: '8px 12px' }}>
                       <select value={row.category}
-                        onChange={e => updateRow(i, { category: e.target.value, splitType: rules[e.target.value] || '50/50' })}
+                        onChange={e => updateRow(i, { category: e.target.value })}
                         style={selectStyle}>
                         {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
                       </select>

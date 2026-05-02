@@ -387,6 +387,17 @@ export function computeItemDebt(item: { value: number; splitType: SplitType; pay
   return { debtor: 'barbara', amount: item.value * bPct / 100 };
 }
 
+export function inferCategory(description: string): string {
+  const d = description.toLowerCase();
+  if (/pet\s?love|petz|cobasi|pet\s?shop/.test(d)) return 'Pets';
+  if (/drogasil|drogaria|raia\d|\braia\b|farmacia|extra ?farma|rd\s?saude|clinica|hospital|laborat|duxnutrition|performancenu|afeet|care\s?club|\bsaude\b|nutrition/.test(d)) return 'Saúde';
+  if (/spotify|netflix|apple\.?com|applecom|claro\s?tv|amazon ad|\bprime\b|openai|chatgpt|anthropic|claude\.ai|disney\+|hbo|globoplay|crewapp/.test(d)) return 'Assinaturas';
+  if (/ifd\*|ifood|uber\s?eats|\bpizz|restaur|\bcafe|botanikafe|boteco|bistro|cheesecake|navarro|sapore|koa\s?food|madaling|insalata|helix|priazzo|amor\s?in\s?pani|bonete|santigusta|carrefour|\bextra\s|pao de a|supermerc|mercado|padaria|hortif|sorvet|burguer|burger|sushi|temaki|companhia brasi|liv\s?up|gpc comercio|nespresso|agua de coco/.test(d)) return 'Alimentação';
+  if (/hotel|booking|airbnb|gol linhas|latam|azul linhas|smiles|cinema|ingresso|teatro|festival|parque|disney|universal|tickets|eventim|playstation|steam|nintendo|centauro|iguanasports|laviesports|\bsports?\b/.test(d)) return 'Lazer';
+  if (/iptu|condom|aluguel|enel|cpfl|sabesp|comgas|energia|internet|vivo fibra|claro fibra|leroy|merlin|telhanorte/.test(d)) return 'Moradia';
+  return 'Outros';
+}
+
 // ── Monthly Computation ───────────────────────────────────────────────────
 
 export async function computeMonth(yearMonth: string): Promise<MonthlySummary> {
@@ -572,7 +583,7 @@ export function parseCSV(text: string): ParsedCSVRow[] {
       description: r.description,
       date: r.date,
       value: Math.abs(r.value),
-      category: 'Outros',
+      category: inferCategory(r.description),
       splitType: '50/50',
       source: 'csv' as const,
       _raw: r.line,

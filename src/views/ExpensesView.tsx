@@ -1,13 +1,13 @@
 import { useState } from 'react';
 import { Card, Btn, EmptyState } from '../components/Primitives';
-import { PersonBadge, CatBadge, SplitBadge, RecurringBadge } from '../components/Badges';
+import { PersonBadge, CatBadge, SplitBadge, RecurringBadge, CSVBadge } from '../components/Badges';
 import { AddExpenseModal } from '../components/AddExpenseModal';
 import {
   CATEGORIES, addInstallment, addExpense, updateExpense, updateInstallmentPlan,
   updateRecurringExpense, deleteExpense, deleteInstallment, getInstallments,
   fmt, fmtDate, computeItemDebt,
 } from '../data';
-import type { ExpenseItem, InstallmentPlan, MonthlySummary, Person, CategoryRules } from '../types';
+import type { ExpenseItem, InstallmentPlan, MonthlySummary, Person, CategoryRules, ExpenseSource } from '../types';
 
 interface ExpensesViewProps {
   summary: MonthlySummary;
@@ -21,11 +21,13 @@ export function ExpensesView({ summary, rules, onDataChange }: ExpensesViewProps
   const [editingPlan, setEditingPlan] = useState<InstallmentPlan | null>(null);
   const [filterPerson, setFilterPerson] = useState<'all' | Person>('all');
   const [filterCat, setFilterCat] = useState('all');
+  const [filterSource, setFilterSource] = useState<'all' | ExpenseSource>('all');
 
   const allItems = summary.items;
   const filtered = allItems.filter(e =>
     (filterPerson === 'all' || e.payer === filterPerson) &&
-    (filterCat === 'all' || e.category === filterCat)
+    (filterCat === 'all' || e.category === filterCat) &&
+    (filterSource === 'all' || e.source === filterSource)
   );
 
   async function handleSave(type: 'installment' | 'expense', data: Record<string, unknown>) {
@@ -146,6 +148,13 @@ export function ExpensesView({ summary, rules, onDataChange }: ExpensesViewProps
             <option value="all">Todas categorias</option>
             {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
           </select>
+          <select value={filterSource} onChange={e => setFilterSource(e.target.value as 'all' | ExpenseSource)} style={selectStyle}>
+            <option value="all">Todas origens</option>
+            <option value="manual">Manual</option>
+            <option value="csv">Cartão (CSV)</option>
+            <option value="installment">Parcelado</option>
+            <option value="recurring">Fixo</option>
+          </select>
         </div>
         <Btn onClick={() => setShowAdd(true)}>+ Novo lançamento</Btn>
       </div>
@@ -170,12 +179,12 @@ export function ExpensesView({ summary, rules, onDataChange }: ExpensesViewProps
                       onMouseLeave={e => e.currentTarget.querySelectorAll('td').forEach(td => (td.style.background = ''))}>
                       <td style={{ padding: '10px 16px', fontSize: 13, color: 'var(--orc-text-2)', whiteSpace: 'nowrap' }}>{fmtDate(item.date)}</td>
                       <td style={{ padding: '10px 16px', fontSize: 14, fontWeight: 500 }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
                           {item.description}
                           {item.source === 'recurring' && <RecurringBadge />}
+                          {item.source === 'csv' && <CSVBadge />}
                         </div>
                         {item.source === 'installment' && <div style={{ fontSize: 11, color: 'var(--orc-text-3)' }}>Parcelado</div>}
-                        {item.source === 'csv' && <span style={{ fontSize: 11, color: 'var(--orc-text-3)' }}>CSV</span>}
                       </td>
                       <td style={{ padding: '10px 16px' }}><PersonBadge person={item.payer} /></td>
                       <td style={{ padding: '10px 16px' }}><CatBadge cat={item.category} /></td>
