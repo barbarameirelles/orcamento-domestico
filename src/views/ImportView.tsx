@@ -77,9 +77,8 @@ export function ImportView({ onDataChange, tick: _tick }: ImportViewProps) {
       <Card style={{ marginBottom: 16 }}>
         <SectionLabel>Importar fatura CSV</SectionLabel>
         <div style={{ fontSize: 13, color: 'var(--orc-text-2)', marginBottom: 16 }}>
-          Compatível com Santander e outros bancos. No Santander:{' '}
-          <strong>App → Cartão → Fatura → Exportar</strong> → escolha CSV.
-          Linhas com valor positivo (pagamentos) são ignoradas automaticamente.
+          Compatível com fatura de cartão e extrato bancário. Aceita formato BR (1.234,56) e US (1,234.56).
+          O parser detecta automaticamente qual sinal representa gasto — estornos e pagamentos são ignorados.
         </div>
 
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 16 }} className="orc-grid-2">
