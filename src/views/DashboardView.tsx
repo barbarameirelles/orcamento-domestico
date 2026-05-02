@@ -144,7 +144,7 @@ export function DashboardView({ summary, month }: DashboardViewProps) {
           <div style={{ padding: '16px 20px 12px', borderBottom: '1px solid var(--orc-border)' }}>
             <SectionLabel>Lançamentos do mês</SectionLabel>
           </div>
-          <div style={{ overflowX: 'auto' }}>
+          <div className="orc-only-desktop" style={{ overflowX: 'auto' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
               <thead>
                 <tr style={{ background: 'var(--orc-bg)' }}>
@@ -190,6 +190,36 @@ export function DashboardView({ summary, month }: DashboardViewProps) {
               </tbody>
             </table>
           </div>
+
+          {/* Mobile card layout */}
+          <div className="orc-only-mobile">
+            {summary.items.slice(0, 8).map((item, i) => {
+              const debt = computeItemDebt(item);
+              return (
+                <div key={i} style={{ padding: '12px 14px', borderTop: '1px solid var(--orc-border)' }}>
+                  <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8, marginBottom: 6 }}>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 11, color: 'var(--orc-text-3)', marginBottom: 2 }}>{fmtDate(item.date)}</div>
+                      <div style={{ fontSize: 14, fontWeight: 600, wordBreak: 'break-word' }}>{item.description}</div>
+                    </div>
+                    <div style={{ fontSize: 15, fontWeight: 700, whiteSpace: 'nowrap' }}>{fmt(item.value)}</div>
+                  </div>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, alignItems: 'center', marginBottom: 4 }}>
+                    <PersonBadge person={item.payer} />
+                    <CatBadge cat={item.category} />
+                    <SplitBadge splitType={item.splitType} />
+                    {item.source === 'recurring' && <RecurringBadge />}
+                  </div>
+                  {debt.amount >= 0.01 && (
+                    <div style={{ fontSize: 12, color: 'var(--orc-text-2)', marginTop: 6, display: 'flex', alignItems: 'center', gap: 6 }}>
+                      Acerto <PersonBadge person={debt.debtor} /> <strong style={{ color: 'var(--orc-text)' }}>{fmt(debt.amount)}</strong>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+
           {summary.items.length > 8 && (
             <div style={{ padding: '12px 20px', textAlign: 'center', fontSize: 13, color: 'var(--orc-text-3)', borderTop: '1px solid var(--orc-border)' }}>
               + {summary.items.length - 8} lançamentos — veja em Gastos

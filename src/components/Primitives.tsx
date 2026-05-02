@@ -53,13 +53,39 @@ export function SectionLabel({ children }: { children: React.ReactNode }) {
 export function Modal({ children, onClose, title, width = 520 }: { children: React.ReactNode; onClose: () => void; title: string; width?: number }) {
   return (
     <div
+      className="orc-modal-overlay"
       style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}
       onClick={e => e.target === e.currentTarget && onClose()}
     >
-      <div style={{ background: '#fff', borderRadius: 16, padding: 24, width: '100%', maxWidth: width, maxHeight: '90vh', overflowY: 'auto', boxShadow: '0 24px 64px rgba(0,0,0,0.18)' }}>
+      <style>{`
+        @media (max-width: 600px) {
+          .orc-modal-overlay { padding: 0 !important; align-items: flex-end !important; }
+          .orc-modal-sheet {
+            border-radius: 16px 16px 0 0 !important;
+            max-width: 100% !important;
+            max-height: 92vh !important;
+            padding: 18px !important;
+            padding-bottom: max(18px, env(safe-area-inset-bottom)) !important;
+            animation: orc-slide-up 0.22s cubic-bezier(0.2, 0.8, 0.2, 1);
+          }
+          .orc-modal-sheet::before {
+            content: '';
+            display: block;
+            width: 36px; height: 4px;
+            background: var(--orc-border);
+            border-radius: 2px;
+            margin: -4px auto 12px;
+          }
+        }
+        @keyframes orc-slide-up {
+          from { transform: translateY(100%); }
+          to { transform: translateY(0); }
+        }
+      `}</style>
+      <div className="orc-modal-sheet" style={{ background: '#fff', borderRadius: 16, padding: 24, width: '100%', maxWidth: width, maxHeight: '90vh', overflowY: 'auto', boxShadow: '0 24px 64px rgba(0,0,0,0.18)' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
           <div style={{ fontWeight: 700, fontSize: 17, color: 'var(--orc-text)' }}>{title}</div>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', fontSize: 20, cursor: 'pointer', color: 'var(--orc-text-2)', lineHeight: 1 }}>×</button>
+          <button onClick={onClose} aria-label="Fechar" style={{ background: 'none', border: 'none', fontSize: 24, cursor: 'pointer', color: 'var(--orc-text-2)', lineHeight: 1, padding: 4, minWidth: 32, minHeight: 32 }}>×</button>
         </div>
         {children}
       </div>

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Card, Btn, EmptyState } from '../components/Primitives';
+import { Card, EmptyState } from '../components/Primitives';
 import { PersonBadge, CatBadge, SplitBadge, RecurringBadge, CSVBadge } from '../components/Badges';
 import { AddExpenseModal } from '../components/AddExpenseModal';
 import {
@@ -16,7 +16,6 @@ interface ExpensesViewProps {
 }
 
 export function ExpensesView({ summary, rules, onDataChange }: ExpensesViewProps) {
-  const [showAdd, setShowAdd] = useState(false);
   const [editingItem, setEditingItem] = useState<ExpenseItem | null>(null);
   const [editingPlan, setEditingPlan] = useState<InstallmentPlan | null>(null);
   const [filterPerson, setFilterPerson] = useState<'all' | Person>('all');
@@ -137,33 +136,30 @@ export function ExpensesView({ summary, rules, onDataChange }: ExpensesViewProps
 
   return (
     <div>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16, flexWrap: 'wrap', gap: 10 }}>
-        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-          <select value={filterPerson} onChange={e => setFilterPerson(e.target.value as 'all' | Person)} style={selectStyle}>
-            <option value="all">Todos</option>
-            <option value="barbara">Barbara</option>
-            <option value="felipe">Felipe</option>
-          </select>
-          <select value={filterCat} onChange={e => setFilterCat(e.target.value)} style={selectStyle}>
-            <option value="all">Todas categorias</option>
-            {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
-          </select>
-          <select value={filterSource} onChange={e => setFilterSource(e.target.value as 'all' | ExpenseSource)} style={selectStyle}>
-            <option value="all">Todas origens</option>
-            <option value="manual">Manual</option>
-            <option value="csv">Cartão (CSV)</option>
-            <option value="installment">Parcelado</option>
-            <option value="recurring">Fixo</option>
-          </select>
-        </div>
-        <Btn onClick={() => setShowAdd(true)}>+ Novo lançamento</Btn>
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 16 }}>
+        <select value={filterPerson} onChange={e => setFilterPerson(e.target.value as 'all' | Person)} style={selectStyle}>
+          <option value="all">Todos</option>
+          <option value="barbara">Barbara</option>
+          <option value="felipe">Felipe</option>
+        </select>
+        <select value={filterCat} onChange={e => setFilterCat(e.target.value)} style={selectStyle}>
+          <option value="all">Todas categorias</option>
+          {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+        </select>
+        <select value={filterSource} onChange={e => setFilterSource(e.target.value as 'all' | ExpenseSource)} style={selectStyle}>
+          <option value="all">Todas origens</option>
+          <option value="manual">Manual</option>
+          <option value="csv">Cartão (CSV)</option>
+          <option value="installment">Parcelado</option>
+          <option value="recurring">Fixo</option>
+        </select>
       </div>
 
       {sorted.length === 0
         ? <EmptyState icon="📋" text="Nenhum lançamento" sub="Clique em '+ Novo lançamento' para começar" />
         : (
           <Card padding={0}>
-            <div style={{ overflowX: 'auto' }}>
+            <div className="orc-only-desktop" style={{ overflowX: 'auto' }}>
               <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                 <thead>
                   <tr style={{ background: 'var(--orc-bg)' }}>
@@ -221,12 +217,53 @@ export function ExpensesView({ summary, rules, onDataChange }: ExpensesViewProps
                 </tbody>
               </table>
             </div>
+
+            {/* Mobile card layout */}
+            <div className="orc-only-mobile">
+              {sorted.map(item => {
+                const debt = computeItemDebt(item);
+                return (
+                  <div key={item.id} style={{ padding: '14px 14px 12px', borderTop: '1px solid var(--orc-border)' }}>
+                    <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8, marginBottom: 6 }}>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: 11, color: 'var(--orc-text-3)', marginBottom: 2 }}>{fmtDate(item.date)}</div>
+                        <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--orc-text)', wordBreak: 'break-word' }}>{item.description}</div>
+                      </div>
+                      <div style={{ fontSize: 16, fontWeight: 700, whiteSpace: 'nowrap' }}>{fmt(item.value)}</div>
+                    </div>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 10 }}>
+                      <PersonBadge person={item.payer} />
+                      <CatBadge cat={item.category} />
+                      <SplitBadge splitType={item.splitType} />
+                      {item.source === 'recurring' && <RecurringBadge />}
+                      {item.source === 'csv' && <CSVBadge />}
+                      {item.source === 'installment' && (
+                        <span style={{ display: 'inline-block', borderRadius: 100, background: '#E8F0FF', color: '#3A7BC8', fontWeight: 600, fontSize: 10, padding: '2px 7px', letterSpacing: '0.03em' }}>Parcelado</span>
+                      )}
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderTop: '1px solid var(--orc-border)', paddingTop: 10 }}>
+                      <div style={{ fontSize: 12, color: 'var(--orc-text-2)' }}>
+                        {debt.amount < 0.01 ? (
+                          <span>Sem acerto</span>
+                        ) : (
+                          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                            Acerto <PersonBadge person={debt.debtor} /> <strong style={{ color: 'var(--orc-text)' }}>{fmt(debt.amount)}</strong>
+                          </span>
+                        )}
+                      </div>
+                      <div style={{ display: 'flex', gap: 4 }}>
+                        <button onClick={() => handleEditClick(item)} aria-label="Editar"
+                          style={{ background: 'var(--orc-bg)', border: 'none', borderRadius: 8, cursor: 'pointer', color: 'var(--orc-text-2)', fontSize: 14, width: 36, height: 36 }}>✎</button>
+                        <button onClick={() => handleDelete(item)} aria-label="Remover"
+                          style={{ background: 'var(--orc-bg)', border: 'none', borderRadius: 8, cursor: 'pointer', color: 'var(--orc-text-2)', fontSize: 18, width: 36, height: 36 }}>×</button>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
           </Card>
         )}
-
-      {showAdd && (
-        <AddExpenseModal onClose={() => setShowAdd(false)} onSave={handleSave} rules={rules} />
-      )}
 
       {editingItem && (
         <AddExpenseModal

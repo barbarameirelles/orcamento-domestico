@@ -94,19 +94,36 @@ export default function OrcamentoApp() {
         .orc-root * { box-sizing: border-box; }
         .orc-root button { transition: opacity 0.15s, background 0.15s, color 0.15s; }
         .orc-root button:active { opacity: 0.7; }
+        .orc-root input, .orc-root select, .orc-root textarea { font-size: 16px; }
         .orc-root ::-webkit-scrollbar { width: 6px; height: 6px; }
         .orc-root ::-webkit-scrollbar-track { background: transparent; }
         .orc-root ::-webkit-scrollbar-thumb { background: var(--orc-border); border-radius: 3px; }
+
+        /* Default desktop/mobile visibility toggles */
+        .orc-only-mobile { display: none; }
+        .orc-only-desktop { display: block; }
+
         @media (max-width: 768px) {
           .orc-sidebar { display: none !important; }
           .orc-main { margin-left: 0 !important; }
-          .orc-main-content { padding: 14px 14px 88px !important; }
-          .orc-header { padding: 10px 14px !important; }
+          .orc-main-content { padding: 12px 12px 96px !important; }
+          .orc-header { padding: 10px 12px !important; flex-wrap: wrap; gap: 8px !important; }
+          .orc-header-actions { width: 100%; justify-content: space-between; gap: 8px !important; }
           .orc-bottom-nav { display: flex !important; }
           .orc-grid-2 { grid-template-columns: 1fr !important; }
+          .orc-modal-grid { grid-template-columns: 1fr !important; gap: 0 !important; }
+          .orc-fab { display: flex !important; }
+          .orc-only-mobile { display: block; }
+          .orc-only-desktop { display: none !important; }
+          .orc-card-pad { padding: 14px !important; }
         }
         @media (max-width: 560px) {
           .orc-charts-grid { grid-template-columns: 1fr !important; }
+        }
+
+        /* Touch target minimums on mobile */
+        @media (hover: none) and (pointer: coarse) {
+          .orc-touch { min-height: 40px; min-width: 40px; }
         }
       `}</style>
 
@@ -161,9 +178,11 @@ export default function OrcamentoApp() {
             justifyContent: 'space-between', position: 'sticky', top: 0, zIndex: 5,
           }}>
             <div style={{ fontWeight: 700, fontSize: 17, color: 'var(--orc-text)' }}>{title}</div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <div className="orc-header-actions" style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
               {showMonthNav && <MonthNav month={month} onChange={setMonth} />}
-              <Btn onClick={() => setAddOpen(true)} style={{ padding: '7px 14px' }}>+ Lançar</Btn>
+              <span className="orc-only-desktop">
+                <Btn onClick={() => setAddOpen(true)} style={{ padding: '7px 14px' }}>+ Lançar</Btn>
+              </span>
             </div>
           </header>
 
@@ -186,20 +205,34 @@ export default function OrcamentoApp() {
           </main>
         </div>
 
+        {/* FAB for + Lançar (mobile) */}
+        <button
+          className="orc-fab"
+          onClick={() => setAddOpen(true)}
+          aria-label="Novo lançamento"
+          style={{
+            display: 'none', position: 'fixed', bottom: 76, right: 16, zIndex: 15,
+            width: 56, height: 56, borderRadius: 28, border: 'none',
+            background: 'var(--orc-accent)', color: '#fff',
+            fontSize: 28, fontWeight: 300, lineHeight: 1, cursor: 'pointer',
+            boxShadow: '0 6px 18px rgba(58,123,200,0.35), 0 2px 6px rgba(0,0,0,0.12)',
+            alignItems: 'center', justifyContent: 'center',
+          }}>+</button>
+
         {/* Bottom nav (mobile) */}
         <nav className="orc-bottom-nav" style={{
           display: 'none', position: 'fixed', bottom: 0, left: 0, right: 0,
           background: '#fff', borderTop: '1px solid var(--orc-border)', zIndex: 10,
-          padding: '6px 0',
+          padding: '6px 0', paddingBottom: 'max(6px, env(safe-area-inset-bottom))',
         }}>
-          {NAV.slice(0, 5).map(n => (
+          {NAV.map(n => (
             <button key={n.id} onClick={() => handleNavSelect(n.id)}
               style={{
                 flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center',
                 gap: 2, border: 'none', background: 'none', cursor: 'pointer',
-                fontFamily: 'inherit', padding: '4px 0',
+                fontFamily: 'inherit', padding: '6px 2px', minHeight: 52,
                 color: tab === n.id ? 'var(--orc-accent)' : 'var(--orc-text-3)',
-                fontSize: 10, fontWeight: tab === n.id ? 700 : 400,
+                fontSize: 10, fontWeight: tab === n.id ? 700 : 500,
               }}>
               <span style={{ fontSize: 18 }}>{n.icon}</span>
               {n.label.split(' ')[0]}

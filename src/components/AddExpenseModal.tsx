@@ -165,7 +165,7 @@ export function AddExpenseModal({ onClose, onSave, rules, prefill, editMode }: A
             style={inputStyle} />
         </FormRow>
 
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+        <div className="orc-modal-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
           <FormRow label={tipo === 'parcelado' ? 'Data (1ª parcela)' : 'Data'}>
             <input type="date" value={date} onChange={e => setDate(e.target.value)} required style={inputStyle} />
           </FormRow>
@@ -189,7 +189,7 @@ export function AddExpenseModal({ onClose, onSave, rules, prefill, editMode }: A
           </FormRow>
         )}
 
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+        <div className="orc-modal-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
           <FormRow label="Categoria">
             <select value={cat} onChange={e => setCat(e.target.value)} style={selectStyle}>
               {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
