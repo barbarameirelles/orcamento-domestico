@@ -5,7 +5,7 @@ import { AddExpenseModal } from '../components/AddExpenseModal';
 import {
   CATEGORIES, addInstallment, addExpense, updateExpense, updateInstallmentPlan,
   updateRecurringExpense, deleteExpense, deleteInstallment, getInstallments,
-  fmt, fmtDate,
+  fmt, fmtDate, computeItemDebt,
 } from '../data';
 import type { ExpenseItem, InstallmentPlan, MonthlySummary, Person, CategoryRules } from '../types';
 
@@ -158,7 +158,7 @@ export function ExpensesView({ summary, rules, onDataChange }: ExpensesViewProps
               <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                 <thead>
                   <tr style={{ background: 'var(--orc-bg)' }}>
-                    {['Data', 'Descrição', 'Quem pagou', 'Categoria', 'Quem arca', 'Valor', '', ''].map(h => (
+                    {['Data', 'Descrição', 'Quem pagou', 'Categoria', 'Quem arca', 'Valor', 'Acerto', '', ''].map(h => (
                       <th key={h} style={{ fontSize: 11, fontWeight: 700, color: 'var(--orc-text-3)', textAlign: 'left', padding: '9px 16px', textTransform: 'uppercase', letterSpacing: '0.07em', whiteSpace: 'nowrap' }}>{h}</th>
                     ))}
                   </tr>
@@ -180,7 +180,23 @@ export function ExpensesView({ summary, rules, onDataChange }: ExpensesViewProps
                       <td style={{ padding: '10px 16px' }}><PersonBadge person={item.payer} /></td>
                       <td style={{ padding: '10px 16px' }}><CatBadge cat={item.category} /></td>
                       <td style={{ padding: '10px 16px' }}><SplitBadge splitType={item.splitType} /></td>
-                      <td style={{ padding: '10px 16px', fontSize: 14, fontWeight: 700, textAlign: 'right', whiteSpace: 'nowrap' }}>{fmt(item.value)}</td>
+                      <td style={{ padding: '10px 16px', textAlign: 'right', whiteSpace: 'nowrap' }}>
+                        <div style={{ fontSize: 14, fontWeight: 700 }}>{fmt(item.value)}</div>
+                      </td>
+                      <td style={{ padding: '10px 16px', whiteSpace: 'nowrap' }}>
+                        {(() => {
+                          const debt = computeItemDebt(item);
+                          if (debt.amount < 0.01) {
+                            return <span style={{ fontSize: 12, color: 'var(--orc-text-3)' }}>—</span>;
+                          }
+                          return (
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                              <PersonBadge person={debt.debtor} />
+                              <span style={{ fontSize: 13, fontWeight: 600 }}>{fmt(debt.amount)}</span>
+                            </div>
+                          );
+                        })()}
+                      </td>
                       <td style={{ padding: '10px 16px' }}>
                         <button onClick={() => handleEditClick(item)}
                           style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--orc-text-3)', fontSize: 14, lineHeight: 1 }}

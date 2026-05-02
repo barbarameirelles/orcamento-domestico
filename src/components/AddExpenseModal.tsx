@@ -36,6 +36,8 @@ export function AddExpenseModal({ onClose, onSave, rules, prefill, editMode }: A
   // Controla se o primeiro render já passou para não sobrescrever o prefill de split
   const isMounted = useRef(false);
 
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
   const isCustom = split === 'custom';
   const effectiveSplit = isCustom ? `${customB}/${customF}` : split;
 
@@ -85,29 +87,37 @@ export function AddExpenseModal({ onClose, onSave, rules, prefill, editMode }: A
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!desc.trim() || valNum <= 0 || !date) return;
-    if (tipo === 'parcelado') {
-      await onSave('installment', {
-        description: desc,
-        payer,
-        startDate: date,
-        totalValue: valNum,
-        installmentCount: parcNum,
-        category: cat,
-        splitType: effectiveSplit,
-      });
-    } else {
-      await onSave('expense', {
-        description: desc,
-        payer,
-        date,
-        value: valNum,
-        category: cat,
-        splitType: effectiveSplit,
-        source: 'manual',
-      });
+    if (!desc.trim() || valNum <= 0 || !date || isSubmitting) return;
+    setIsSubmitting(true);
+    try {
+      if (tipo === 'parcelado') {
+        await onSave('installment', {
+          description: desc,
+          payer,
+          startDate: date,
+          totalValue: valNum,
+          installmentCount: parcNum,
+          category: cat,
+          splitType: effectiveSplit,
+        });
+      } else {
+        await onSave('expense', {
+          description: desc,
+          payer,
+          date,
+          value: valNum,
+          category: cat,
+          splitType: effectiveSplit,
+          source: 'manual',
+        });
+      }
+      onClose();
+    } catch (err) {
+      console.error('[AddExpenseModal] Erro ao salvar:', err);
+      alert('Erro ao salvar: ' + (err instanceof Error ? err.message : JSON.stringify(err)));
+    } finally {
+      setIsSubmitting(false);
     }
-    onClose();
   }
 
   const inputStyle: React.CSSProperties = {
@@ -217,8 +227,8 @@ export function AddExpenseModal({ onClose, onSave, rules, prefill, editMode }: A
         </div>
 
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 8 }}>
-          <Btn variant="secondary" onClick={onClose}>Cancelar</Btn>
-          <Btn type="submit">Salvar</Btn>
+          <Btn variant="secondary" onClick={onClose} disabled={isSubmitting}>Cancelar</Btn>
+          <Btn type="submit" disabled={isSubmitting}>{isSubmitting ? 'Salvando…' : 'Salvar'}</Btn>
         </div>
       </form>
     </Modal>

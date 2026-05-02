@@ -379,6 +379,14 @@ export function parseSplit(splitType: SplitType): [number, number] {
   return [50, 50];
 }
 
+export function computeItemDebt(item: { value: number; splitType: SplitType; payer: 'barbara' | 'felipe' }): { debtor: 'barbara' | 'felipe'; amount: number } {
+  const [bPct, fPct] = parseSplit(item.splitType);
+  if (item.payer === 'barbara') {
+    return { debtor: 'felipe', amount: item.value * fPct / 100 };
+  }
+  return { debtor: 'barbara', amount: item.value * bPct / 100 };
+}
+
 // ── Monthly Computation ───────────────────────────────────────────────────
 
 export async function computeMonth(yearMonth: string): Promise<MonthlySummary> {
@@ -502,6 +510,24 @@ export interface ParsedCSVRow {
   _raw: string;
 }
 
+function parseMoney(raw: string): number {
+  const clean = raw.replace(/[^\d.,\-]/g, '');
+  if (!clean) return NaN;
+  const sign = clean.startsWith('-') ? -1 : 1;
+  const digits = clean.replace(/^-/, '');
+  const lastDot = digits.lastIndexOf('.');
+  const lastComma = digits.lastIndexOf(',');
+  const lastSep = Math.max(lastDot, lastComma);
+  if (lastSep === -1) return sign * parseFloat(digits);
+  const decDigits = digits.length - 1 - lastSep;
+  if (decDigits >= 1 && decDigits <= 2) {
+    const intPart = digits.substring(0, lastSep).replace(/[.,]/g, '');
+    const decPart = digits.substring(lastSep + 1);
+    return sign * parseFloat((intPart || '0') + '.' + decPart);
+  }
+  return sign * parseFloat(digits.replace(/[.,]/g, ''));
+}
+
 export function parseCSV(text: string): ParsedCSVRow[] {
   const lines = text.trim().split(/\r?\n/);
   if (lines.length < 2) return [];
@@ -517,7 +543,7 @@ export function parseCSV(text: string): ParsedCSVRow[] {
   const descI = descIdx >= 0 ? descIdx : 1;
   const valI = valIdx >= 0 ? valIdx : 2;
 
-  const results: ParsedCSVRow[] = [];
+  const rawRows: { date: string; description: string; value: number; line: string }[] = [];
   for (let i = 1; i < lines.length; i++) {
     const cols = lines[i].split(sep).map(c => c.trim().replace(/"/g, ''));
     if (cols.length < 2) continue;
@@ -529,16 +555,28 @@ export function parseCSV(text: string): ParsedCSVRow[] {
     if (dm) date = `${dm[3]}-${dm[2]}-${dm[1]}`;
     else if (dm2) date = raw.substring(0, 10);
 
-    const rawVal = (cols[valI] || '').replace(/\./g, '').replace(',', '.').replace(/[^\d.\-]/g, '');
-    const v = parseFloat(rawVal);
+    const v = parseMoney(cols[valI] || '');
+    if (!date || isNaN(v) || v === 0) continue;
 
-    if (!date || isNaN(v)) continue;
-    if (v >= 0) continue;
-
-    const description = cols[descI] || 'Importado';
-    results.push({ description, date, value: Math.abs(v), category: 'Outros', splitType: '50/50', source: 'csv', _raw: lines[i] });
+    rawRows.push({ date, description: cols[descI] || 'Importado', value: v, line: lines[i] });
   }
-  return results;
+
+  // Auto-detect sign convention: keep the dominant side (by sum), drop refunds/payments on the other side.
+  const posSum = rawRows.filter(r => r.value > 0).reduce((s, r) => s + r.value, 0);
+  const negSum = rawRows.filter(r => r.value < 0).reduce((s, r) => s - r.value, 0);
+  const expenseSign = posSum >= negSum ? 1 : -1;
+
+  return rawRows
+    .filter(r => (r.value > 0 ? 1 : -1) === expenseSign)
+    .map(r => ({
+      description: r.description,
+      date: r.date,
+      value: Math.abs(r.value),
+      category: 'Outros',
+      splitType: '50/50',
+      source: 'csv' as const,
+      _raw: r.line,
+    }));
 }
 
 // ── Formatting ────────────────────────────────────────────────────────────
