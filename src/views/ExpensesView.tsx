@@ -1,10 +1,11 @@
 import { useState } from 'react';
-import { Card, EmptyState, Btn } from '../components/Primitives';
+import { Card, EmptyState, Btn, UndoToast } from '../components/Primitives';
 import { PersonBadge, CatBadge, SplitBadge } from '../components/Badges';
 import { AddExpenseModal } from '../components/AddExpenseModal';
 import {
   CATEGORIES, addInstallment, addExpense, updateExpense, updateInstallmentPlan,
-  updateRecurringExpense, deleteExpense, deleteExpenses, deleteInstallment, getInstallments,
+  updateRecurringExpense, deleteExpense, deleteExpenses, restoreExpenses,
+  deleteInstallment, getInstallments,
   fmt, fmtDate, computeItemDebt,
 } from '../data';
 import type { ExpenseItem, InstallmentPlan, MonthlySummary, Person, CategoryRules, ExpenseSource } from '../types';
@@ -60,6 +61,19 @@ export function ExpensesView({ summary, rules, onDataChange }: ExpensesViewProps
   const [sortKey, setSortKey] = useState<SortKey>('date');
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [undo, setUndo] = useState<{ ids: string[]; message: string } | null>(null);
+
+  async function handleUndo() {
+    if (!undo) return;
+    try {
+      await restoreExpenses(undo.ids);
+      setUndo(null);
+      onDataChange();
+    } catch (err) {
+      console.error('[ExpensesView] Undo failed:', err);
+      alert('Erro ao restaurar: ' + (err instanceof Error ? err.message : JSON.stringify(err)));
+    }
+  }
 
   function toggleSelect(id: string) {
     setSelectedIds(prev => {
@@ -72,11 +86,14 @@ export function ExpensesView({ summary, rules, onDataChange }: ExpensesViewProps
   async function handleBulkDelete() {
     const ids = Array.from(selectedIds);
     if (ids.length === 0) return;
-    if (!confirm(`Remover ${ids.length} lançamento${ids.length > 1 ? 's' : ''}? Esta ação não pode ser desfeita.`)) return;
     try {
       await deleteExpenses(ids);
       setSelectedIds(new Set());
       onDataChange();
+      setUndo({
+        ids,
+        message: `${ids.length} ${ids.length === 1 ? 'lançamento removido' : 'lançamentos removidos'}`,
+      });
     } catch (err) {
       console.error('[ExpensesView] Bulk delete failed:', err);
       alert('Erro ao remover: ' + (err instanceof Error ? err.message : JSON.stringify(err)));
@@ -147,15 +164,26 @@ export function ExpensesView({ summary, rules, onDataChange }: ExpensesViewProps
 
   async function handleDelete(item: ExpenseItem) {
     if (item.source === 'installment') {
+      // Installments hard-delete the entire plan, so still gate with confirm.
       if (confirm('Este é um gasto parcelado. Deseja remover o parcelamento inteiro?')) {
         await deleteInstallment(item.installmentPlanId!);
         onDataChange();
       }
-    } else {
-      if (confirm('Remover este lançamento?')) {
-        await deleteExpense(item.id);
-        onDataChange();
-      }
+      return;
+    }
+    if (item.source === 'recurring') {
+      // Recurring items are virtualized — deletion is handled in Configurações.
+      alert('Para remover um gasto fixo, vá em Configurações → Gastos fixos mensais.');
+      return;
+    }
+    // Manual / CSV: soft delete with undo.
+    try {
+      await deleteExpense(item.id);
+      onDataChange();
+      setUndo({ ids: [item.id], message: 'Lançamento removido' });
+    } catch (err) {
+      console.error('[ExpensesView] Delete failed:', err);
+      alert('Erro ao remover: ' + (err instanceof Error ? err.message : JSON.stringify(err)));
     }
   }
 
@@ -466,6 +494,14 @@ export function ExpensesView({ summary, rules, onDataChange }: ExpensesViewProps
           rules={rules}
           editMode
           prefill={buildPrefill()}
+        />
+      )}
+
+      {undo && (
+        <UndoToast
+          message={undo.message}
+          onUndo={handleUndo}
+          onDismiss={() => setUndo(null)}
         />
       )}
     </div>

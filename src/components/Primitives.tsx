@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 
 type BtnVariant = 'primary' | 'secondary' | 'ghost' | 'danger' | 'barbara' | 'felipe';
 
@@ -118,6 +118,69 @@ export function SegmentedControl({ options, value, onChange }: { options: { valu
           {o.label}
         </button>
       ))}
+    </div>
+  );
+}
+
+export function UndoToast({ message, onUndo, onDismiss, durationMs = 6000 }: {
+  message: string;
+  onUndo: () => void;
+  onDismiss: () => void;
+  durationMs?: number;
+}) {
+  const [progress, setProgress] = useState(100);
+  useEffect(() => {
+    const start = Date.now();
+    const timer = setInterval(() => {
+      const elapsed = Date.now() - start;
+      const pct = Math.max(0, 100 - (elapsed / durationMs) * 100);
+      setProgress(pct);
+      if (elapsed >= durationMs) {
+        clearInterval(timer);
+        onDismiss();
+      }
+    }, 60);
+    return () => clearInterval(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  return (
+    <div role="status" aria-live="polite" style={{
+      position: 'fixed', left: '50%', transform: 'translateX(-50%)',
+      bottom: 'max(96px, calc(env(safe-area-inset-bottom) + 96px))',
+      zIndex: 300, minWidth: 280, maxWidth: 'calc(100vw - 24px)',
+      background: 'var(--orc-text)', color: '#fff',
+      borderRadius: 10, padding: '12px 14px',
+      boxShadow: '0 12px 40px rgba(0,0,0,0.25)',
+      display: 'flex', alignItems: 'center', gap: 12,
+      animation: 'orc-fade-in 0.2s ease-out',
+    }}>
+      <style>{`
+        @keyframes orc-fade-in {
+          from { opacity: 0; transform: translate(-50%, 8px); }
+          to { opacity: 1; transform: translate(-50%, 0); }
+        }
+      `}</style>
+      <span style={{ fontSize: 14, flex: 1 }}>{message}</span>
+      <button onClick={onUndo} style={{
+        background: 'transparent', border: 'none', color: '#fff',
+        fontSize: 14, fontWeight: 700, cursor: 'pointer',
+        padding: '6px 10px', borderRadius: 6, fontFamily: 'inherit',
+        textDecoration: 'underline',
+      }}>Desfazer</button>
+      <button onClick={onDismiss} aria-label="Fechar" style={{
+        background: 'transparent', border: 'none', color: 'rgba(255,255,255,0.7)',
+        fontSize: 18, lineHeight: 1, cursor: 'pointer', padding: 4,
+      }}>×</button>
+      <div style={{
+        position: 'absolute', left: 0, right: 0, bottom: 0, height: 3,
+        background: 'rgba(255,255,255,0.15)', borderRadius: '0 0 10px 10px', overflow: 'hidden',
+      }}>
+        <div style={{
+          width: `${progress}%`, height: '100%',
+          background: 'var(--orc-accent)',
+          transition: 'width 60ms linear',
+        }} />
+      </div>
     </div>
   );
 }

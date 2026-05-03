@@ -12,6 +12,7 @@ export interface Expense {
   splitType: SplitType;
   source: ExpenseSource;
   createdAt: string;
+  deletedAt?: string | null;
 }
 
 export interface InstallmentPlan {

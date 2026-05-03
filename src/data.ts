@@ -68,6 +68,7 @@ function expenseFromDb(r: any): Expense {
     splitType: r.split_type,
     source: r.source,
     createdAt: r.created_at,
+    deletedAt: r.deleted_at ?? null,
   };
 }
 
@@ -147,11 +148,20 @@ function recurringToDb(r: RecurringExpense) {
 
 export async function getExpenses(): Promise<Expense[]> {
   if (isSupabaseEnabled) {
-    const { data, error } = await supabase!.from('expenses').select('*');
+    const { data, error } = await supabase!.from('expenses').select('*').is('deleted_at', null);
     if (error) throw error;
     return (data || []).map(expenseFromDb);
   }
-  return load<Expense[]>(KEYS.expenses, []);
+  return load<Expense[]>(KEYS.expenses, []).filter(e => !e.deletedAt);
+}
+
+export async function getDeletedExpenses(): Promise<Expense[]> {
+  if (isSupabaseEnabled) {
+    const { data, error } = await supabase!.from('expenses').select('*').not('deleted_at', 'is', null).order('deleted_at', { ascending: false });
+    if (error) throw error;
+    return (data || []).map(expenseFromDb);
+  }
+  return load<Expense[]>(KEYS.expenses, []).filter(e => !!e.deletedAt);
 }
 
 export async function addExpense(exp: Omit<Expense, 'id' | 'createdAt'>): Promise<Expense> {
@@ -178,16 +188,40 @@ export async function addExpenses(list: Omit<Expense, 'id' | 'createdAt'>[]): Pr
   return newOnes;
 }
 
+// Soft delete: sets deleted_at so the row is hidden but recoverable.
 export async function deleteExpense(id: string): Promise<void> {
-  if (isSupabaseEnabled) {
-    const { error } = await supabase!.from('expenses').delete().eq('id', id);
-    if (error) throw error;
-  } else {
-    save(KEYS.expenses, load<Expense[]>(KEYS.expenses, []).filter(e => e.id !== id));
-  }
+  return deleteExpenses([id]);
 }
 
 export async function deleteExpenses(ids: string[]): Promise<void> {
+  if (ids.length === 0) return;
+  const now = new Date().toISOString();
+  if (isSupabaseEnabled) {
+    const { error } = await supabase!.from('expenses').update({ deleted_at: now }).in('id', ids);
+    if (error) throw error;
+  } else {
+    const set = new Set(ids);
+    save(KEYS.expenses, load<Expense[]>(KEYS.expenses, []).map(e =>
+      set.has(e.id) ? { ...e, deletedAt: now } : e
+    ));
+  }
+}
+
+export async function restoreExpenses(ids: string[]): Promise<void> {
+  if (ids.length === 0) return;
+  if (isSupabaseEnabled) {
+    const { error } = await supabase!.from('expenses').update({ deleted_at: null }).in('id', ids);
+    if (error) throw error;
+  } else {
+    const set = new Set(ids);
+    save(KEYS.expenses, load<Expense[]>(KEYS.expenses, []).map(e =>
+      set.has(e.id) ? { ...e, deletedAt: null } : e
+    ));
+  }
+}
+
+// Hard delete — only used from the trash view to permanently remove.
+export async function purgeExpenses(ids: string[]): Promise<void> {
   if (ids.length === 0) return;
   if (isSupabaseEnabled) {
     const { error } = await supabase!.from('expenses').delete().in('id', ids);

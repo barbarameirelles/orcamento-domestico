@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
-import { Card, SectionLabel, Btn } from '../components/Primitives';
+import { Card, SectionLabel, Btn, Modal } from '../components/Primitives';
 import { PersonBadge } from '../components/Badges';
-import { CATEGORIES, CAT_COLORS, getCategoryRules, setCategoryRules, parseSplit, getRecurringExpenses, deleteRecurringExpense, fmt, fmtDate, DEFAULT_RULES } from '../data';
-import type { CategoryRules, RecurringExpense } from '../types';
+import { CATEGORIES, CAT_COLORS, getCategoryRules, setCategoryRules, parseSplit, getRecurringExpenses, deleteRecurringExpense, getDeletedExpenses, restoreExpenses, purgeExpenses, fmt, fmtDate, DEFAULT_RULES } from '../data';
+import type { CategoryRules, RecurringExpense, Expense } from '../types';
 
 interface SettingsViewProps {
   onDataChange: () => void;
@@ -12,6 +12,45 @@ interface SettingsViewProps {
 export function SettingsView({ onDataChange, tick }: SettingsViewProps) {
   const [rules, setRules] = useState<CategoryRules>(DEFAULT_RULES);
   const [recurring, setRecurring] = useState<RecurringExpense[]>([]);
+  const [trashOpen, setTrashOpen] = useState(false);
+  const [trash, setTrash] = useState<Expense[]>([]);
+  const [trashLoading, setTrashLoading] = useState(false);
+  const [trashSelected, setTrashSelected] = useState<Set<string>>(new Set());
+
+  async function loadTrash() {
+    setTrashLoading(true);
+    try {
+      const items = await getDeletedExpenses();
+      setTrash(items);
+      setTrashSelected(new Set());
+    } finally {
+      setTrashLoading(false);
+    }
+  }
+
+  async function handleRestoreSelected() {
+    const ids = Array.from(trashSelected);
+    if (ids.length === 0) return;
+    await restoreExpenses(ids);
+    await loadTrash();
+    onDataChange();
+  }
+
+  async function handlePurgeSelected() {
+    const ids = Array.from(trashSelected);
+    if (ids.length === 0) return;
+    if (!confirm(`Excluir definitivamente ${ids.length} ${ids.length === 1 ? 'lançamento' : 'lançamentos'}? Esta ação NÃO pode ser desfeita.`)) return;
+    await purgeExpenses(ids);
+    await loadTrash();
+  }
+
+  function toggleTrashSelect(id: string) {
+    setTrashSelected(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  }
   const [customInputs, setCustomInputs] = useState<Record<string, { b: string; f: string }>>(() => {
     const out: Record<string, { b: string; f: string }> = {};
     CATEGORIES.forEach(cat => { out[cat] = { b: '50', f: '50' }; });
@@ -188,6 +227,67 @@ export function SettingsView({ onDataChange, tick }: SettingsViewProps) {
           ))}
         </div>
       </Card>
+
+      <Card style={{ marginBottom: 16 }}>
+        <SectionLabel>Lixeira</SectionLabel>
+        <div style={{ fontSize: 13, color: 'var(--orc-text-2)', marginBottom: 12 }}>
+          Lançamentos removidos ficam aqui e podem ser restaurados. Use "Excluir definitivamente" só quando tiver certeza.
+        </div>
+        <Btn variant="secondary" onClick={async () => { await loadTrash(); setTrashOpen(true); }}>
+          Abrir lixeira
+        </Btn>
+      </Card>
+
+      {trashOpen && (
+        <Modal title="Lixeira" onClose={() => setTrashOpen(false)} width={640}>
+          {trashLoading && <div style={{ color: 'var(--orc-text-3)', fontSize: 14 }}>Carregando…</div>}
+          {!trashLoading && trash.length === 0 && (
+            <div style={{ color: 'var(--orc-text-3)', fontSize: 14, padding: '20px 0', textAlign: 'center' }}>
+              Nada na lixeira.
+            </div>
+          )}
+          {!trashLoading && trash.length > 0 && (
+            <>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12, gap: 10, flexWrap: 'wrap' }}>
+                <div style={{ fontSize: 13, color: 'var(--orc-text-2)' }}>
+                  {trash.length} {trash.length === 1 ? 'item' : 'itens'} · {trashSelected.size} selecionado{trashSelected.size === 1 ? '' : 's'}
+                </div>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <Btn variant="secondary" small disabled={trashSelected.size === 0} onClick={handleRestoreSelected}>
+                    Restaurar
+                  </Btn>
+                  <Btn variant="danger" small disabled={trashSelected.size === 0} onClick={handlePurgeSelected}>
+                    Excluir definitivamente
+                  </Btn>
+                </div>
+              </div>
+              <div style={{ borderTop: '1px solid var(--orc-border)' }}>
+                {trash.map(t => {
+                  const checked = trashSelected.has(t.id);
+                  return (
+                    <label key={t.id} style={{
+                      display: 'flex', alignItems: 'center', gap: 10,
+                      padding: '10px 0', borderBottom: '1px solid var(--orc-border)',
+                      cursor: 'pointer',
+                    }}>
+                      <input type="checkbox" checked={checked}
+                        onChange={() => toggleTrashSelect(t.id)}
+                        style={{ width: 16, height: 16, accentColor: 'var(--orc-accent)' }} />
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--orc-text)', wordBreak: 'break-word' }}>{t.description}</div>
+                        <div style={{ fontSize: 12, color: 'var(--orc-text-3)' }}>
+                          {fmtDate(t.date)} · {t.category} · removido em {t.deletedAt ? fmtDate(t.deletedAt.substring(0, 10)) : '—'}
+                        </div>
+                      </div>
+                      <div style={{ fontWeight: 700, fontSize: 14, whiteSpace: 'nowrap' }}>{fmt(t.value)}</div>
+                    </label>
+                  );
+                })}
+              </div>
+            </>
+          )}
+        </Modal>
+      )}
 
       <Card>
         <SectionLabel>Dados</SectionLabel>
