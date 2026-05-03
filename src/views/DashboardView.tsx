@@ -24,19 +24,36 @@ export function DashboardView({ summary, month }: DashboardViewProps) {
     <div>
       {/* Balance Hero */}
       <Card style={{ marginBottom: 16 }}>
-        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
-          <div>
+        <div className="orc-hero-head" style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
+          <style>{`
+            @media (max-width: 600px) {
+              .orc-hero-head { flex-direction: column; gap: 14px !important; }
+              .orc-hero-total { text-align: left !important; padding-top: 12px; border-top: 1px solid var(--orc-border); width: 100%; display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+              .orc-hero-total-label { margin-bottom: 0 !important; }
+            }
+          `}</style>
+          <div style={{ minWidth: 0, flex: 1 }}>
             <SectionLabel>Acerto do mês</SectionLabel>
             {!hasData && <div style={{ color: 'var(--orc-text-3)', fontSize: 14 }}>Nenhum lançamento ainda</div>}
             {hasData && !owes && (
-              <div style={{ fontWeight: 700, fontSize: 22, color: 'var(--orc-green)' }}>✓ Estão quites!</div>
+              <div style={{ fontWeight: 700, fontSize: 'clamp(18px, 5vw, 22px)', color: 'var(--orc-green)' }}>✓ Estão quites!</div>
             )}
             {hasData && owes && (
               <>
-                <div style={{ fontWeight: 700, fontSize: 22 }}>
-                  <PersonBadge person={owes.from} size="lg" />{' '}deve pagar{' '}
-                  <span style={{ color: 'var(--orc-green)' }}>{fmt(owes.amount)}</span>{' '}para{' '}
-                  <PersonBadge person={owes.to} size="lg" />
+                <div style={{
+                  fontWeight: 700,
+                  fontSize: 'clamp(17px, 4.6vw, 22px)',
+                  lineHeight: 1.35,
+                  display: 'flex', flexWrap: 'wrap', alignItems: 'center',
+                  columnGap: 8, rowGap: 6,
+                }}>
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8, whiteSpace: 'nowrap' }}>
+                    <PersonBadge person={owes.from} size="lg" /> deve pagar
+                  </span>
+                  <span style={{ color: 'var(--orc-green)', whiteSpace: 'nowrap' }}>{fmt(owes.amount)}</span>
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8, whiteSpace: 'nowrap' }}>
+                    para <PersonBadge person={owes.to} size="lg" />
+                  </span>
                 </div>
                 <div style={{ marginTop: 6, fontSize: 13, color: 'var(--orc-text-3)' }}>
                   Pagamento no início de <strong style={{ color: 'var(--orc-text-2)' }}>{nextMonth}</strong>
@@ -44,9 +61,9 @@ export function DashboardView({ summary, month }: DashboardViewProps) {
               </>
             )}
           </div>
-          <div style={{ textAlign: 'right' }}>
-            <div style={{ fontSize: 12, color: 'var(--orc-text-3)' }}>Total do mês</div>
-            <div style={{ fontWeight: 700, fontSize: 26, color: 'var(--orc-text)' }}>{fmt(total)}</div>
+          <div className="orc-hero-total" style={{ textAlign: 'right' }}>
+            <div className="orc-hero-total-label" style={{ fontSize: 12, color: 'var(--orc-text-3)' }}>Total do mês</div>
+            <div style={{ fontWeight: 700, fontSize: 'clamp(20px, 5.5vw, 26px)', color: 'var(--orc-text)' }}>{fmt(total)}</div>
           </div>
         </div>
 
