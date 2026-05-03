@@ -15,12 +15,14 @@ interface EditableRow extends ParsedCSVRow {
 }
 
 export function ImportView({ onDataChange, tick: _tick }: ImportViewProps) {
-  const [payer, setPayer] = useState<Person>('barbara');
+  const [cardholder, setCardholder] = useState<Person>('barbara');
   const [editedRows, setEditedRows] = useState<EditableRow[]>([]);
   const [importing, setImporting] = useState(false);
   const [done, setDone] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
+  // Barbara pays both invoices in this household. Split follows the cardholder
+  // (whose card it is, i.e. who is responsible for paying her back).
   function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -29,8 +31,8 @@ export function ImportView({ onDataChange, tick: _tick }: ImportViewProps) {
       const parsed = parseCSV(ev.target?.result as string);
       const withDefaults = parsed.map(r => ({
         ...r,
-        payer,
-        splitType: 'barbara' as SplitType,
+        payer: 'barbara' as Person,
+        splitType: cardholder as SplitType,
         selected: true,
       }));
       setEditedRows(withDefaults);
@@ -40,8 +42,8 @@ export function ImportView({ onDataChange, tick: _tick }: ImportViewProps) {
   }
 
   useEffect(() => {
-    setEditedRows(rows => rows.map(r => ({ ...r, payer })));
-  }, [payer]);
+    setEditedRows(rows => rows.map(r => ({ ...r, splitType: cardholder as SplitType })));
+  }, [cardholder]);
 
   function updateRow(i: number, patch: Partial<EditableRow>) {
     setEditedRows(rows => rows.map((r, idx) => idx === i ? { ...r, ...patch } : r));
@@ -86,7 +88,7 @@ export function ImportView({ onDataChange, tick: _tick }: ImportViewProps) {
           <FormRow label="Cartão de quem">
             <SegmentedControl
               options={[{ value: 'barbara', label: 'Barbara' }, { value: 'felipe', label: 'Felipe' }]}
-              value={payer} onChange={v => setPayer(v as Person)} />
+              value={cardholder} onChange={v => setCardholder(v as Person)} />
           </FormRow>
           <FormRow label="Arquivo CSV">
             <input

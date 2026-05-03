@@ -187,6 +187,17 @@ export async function deleteExpense(id: string): Promise<void> {
   }
 }
 
+export async function deleteExpenses(ids: string[]): Promise<void> {
+  if (ids.length === 0) return;
+  if (isSupabaseEnabled) {
+    const { error } = await supabase!.from('expenses').delete().in('id', ids);
+    if (error) throw error;
+  } else {
+    const set = new Set(ids);
+    save(KEYS.expenses, load<Expense[]>(KEYS.expenses, []).filter(e => !set.has(e.id)));
+  }
+}
+
 export async function updateExpense(id: string, patch: Partial<Expense>): Promise<void> {
   if (isSupabaseEnabled) {
     const dbPatch: Record<string, unknown> = {};

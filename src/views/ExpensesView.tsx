@@ -1,10 +1,10 @@
 import { useState } from 'react';
-import { Card, EmptyState } from '../components/Primitives';
-import { PersonBadge, CatBadge, SplitBadge, RecurringBadge, CSVBadge } from '../components/Badges';
+import { Card, EmptyState, Btn } from '../components/Primitives';
+import { PersonBadge, CatBadge, SplitBadge } from '../components/Badges';
 import { AddExpenseModal } from '../components/AddExpenseModal';
 import {
   CATEGORIES, addInstallment, addExpense, updateExpense, updateInstallmentPlan,
-  updateRecurringExpense, deleteExpense, deleteInstallment, getInstallments,
+  updateRecurringExpense, deleteExpense, deleteExpenses, deleteInstallment, getInstallments,
   fmt, fmtDate, computeItemDebt,
 } from '../data';
 import type { ExpenseItem, InstallmentPlan, MonthlySummary, Person, CategoryRules, ExpenseSource } from '../types';
@@ -15,7 +15,41 @@ interface ExpensesViewProps {
   onDataChange: () => void;
 }
 
-type SortKey = 'date' | 'description' | 'payer' | 'category' | 'splitType' | 'value' | 'debt';
+type SortKey = 'date' | 'description' | 'payer' | 'category' | 'splitType' | 'value' | 'debt' | 'source';
+
+const SOURCE_LABEL: Record<ExpenseSource, string> = {
+  manual: 'Manual',
+  csv: 'Cartão',
+  installment: 'Parcelado',
+  recurring: 'Fixo',
+};
+
+const SOURCE_STYLE: Record<ExpenseSource, { bg: string; color: string }> = {
+  manual: { bg: '#EFEDE8', color: '#6A6864' },
+  csv: { bg: '#E8E0F5', color: '#6A4FB5' },
+  installment: { bg: '#E8F0FF', color: '#3A7BC8' },
+  recurring: { bg: '#FFF3CD', color: '#9A6B00' },
+};
+
+function SourcePill({ source }: { source: ExpenseSource }) {
+  const s = SOURCE_STYLE[source];
+  return (
+    <span style={{
+      display: 'inline-block', borderRadius: 100,
+      background: s.bg, color: s.color,
+      fontWeight: 600, fontSize: 11, padding: '2px 8px',
+      whiteSpace: 'nowrap',
+    }}>
+      {SOURCE_LABEL[source]}
+    </span>
+  );
+}
+
+// Only manual/csv expenses live as real rows in the `expenses` table and can
+// be safely bulk-deleted. Installments and recurring are virtualized per month.
+function isBulkDeletable(item: ExpenseItem): boolean {
+  return item.source === 'manual' || item.source === 'csv';
+}
 
 export function ExpensesView({ summary, rules, onDataChange }: ExpensesViewProps) {
   const [editingItem, setEditingItem] = useState<ExpenseItem | null>(null);
@@ -25,6 +59,29 @@ export function ExpensesView({ summary, rules, onDataChange }: ExpensesViewProps
   const [filterSource, setFilterSource] = useState<'all' | ExpenseSource>('all');
   const [sortKey, setSortKey] = useState<SortKey>('date');
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+
+  function toggleSelect(id: string) {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  }
+
+  async function handleBulkDelete() {
+    const ids = Array.from(selectedIds);
+    if (ids.length === 0) return;
+    if (!confirm(`Remover ${ids.length} lançamento${ids.length > 1 ? 's' : ''}? Esta ação não pode ser desfeita.`)) return;
+    try {
+      await deleteExpenses(ids);
+      setSelectedIds(new Set());
+      onDataChange();
+    } catch (err) {
+      console.error('[ExpensesView] Bulk delete failed:', err);
+      alert('Erro ao remover: ' + (err instanceof Error ? err.message : JSON.stringify(err)));
+    }
+  }
 
   function toggleSort(key: SortKey) {
     if (sortKey === key) {
@@ -65,7 +122,10 @@ export function ExpensesView({ summary, rules, onDataChange }: ExpensesViewProps
             startDate: (data.startDate ?? data.date) as string,
           });
         } else {
-          await updateExpense(editingItem.id, data as Parameters<typeof updateExpense>[1]);
+          // Preserve original source — modal always sends 'manual' on save, but
+          // editing a CSV/imported expense should keep its origin.
+          const { source: _ignored, ...patch } = data as Record<string, unknown>;
+          await updateExpense(editingItem.id, patch as Parameters<typeof updateExpense>[1]);
         }
         setEditingItem(null);
         setEditingPlan(null);
@@ -138,6 +198,8 @@ export function ExpensesView({ summary, rules, onDataChange }: ExpensesViewProps
         return dir * (a.value - b.value);
       case 'debt':
         return dir * (computeItemDebt(a).amount - computeItemDebt(b).amount);
+      case 'source':
+        return dir * a.source.localeCompare(b.source);
       default:
         return 0;
     }
@@ -206,6 +268,23 @@ export function ExpensesView({ summary, rules, onDataChange }: ExpensesViewProps
         </select>
       </div>
 
+      {selectedIds.size > 0 && (
+        <div style={{
+          position: 'sticky', top: 0, zIndex: 4,
+          marginBottom: 12, padding: '10px 14px',
+          background: 'oklch(94% 0.05 238)', border: '1px solid var(--orc-accent)',
+          borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap',
+        }}>
+          <div style={{ fontSize: 14, color: 'var(--orc-text)' }}>
+            <strong>{selectedIds.size}</strong> {selectedIds.size === 1 ? 'lançamento selecionado' : 'lançamentos selecionados'}
+          </div>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <Btn variant="secondary" small onClick={() => setSelectedIds(new Set())}>Limpar</Btn>
+            <Btn variant="danger" small onClick={handleBulkDelete}>Remover {selectedIds.size}</Btn>
+          </div>
+        </div>
+      )}
+
       {sorted.length === 0
         ? <EmptyState icon="📋" text="Nenhum lançamento" sub="Clique em '+ Novo lançamento' para começar" />
         : (
@@ -214,9 +293,29 @@ export function ExpensesView({ summary, rules, onDataChange }: ExpensesViewProps
               <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                 <thead>
                   <tr style={{ background: 'var(--orc-bg)' }}>
+                    <th style={{ padding: '9px 8px 9px 16px', width: 36 }}>
+                      <input
+                        type="checkbox"
+                        aria-label="Selecionar todos"
+                        checked={(() => {
+                          const eligible = sorted.filter(isBulkDeletable);
+                          return eligible.length > 0 && eligible.every(i => selectedIds.has(i.id));
+                        })()}
+                        onChange={e => {
+                          const eligible = sorted.filter(isBulkDeletable).map(i => i.id);
+                          setSelectedIds(prev => {
+                            if (e.target.checked) return new Set([...prev, ...eligible]);
+                            const next = new Set(prev);
+                            eligible.forEach(id => next.delete(id));
+                            return next;
+                          });
+                        }}
+                        style={{ width: 16, height: 16, cursor: 'pointer', accentColor: 'var(--orc-accent)' }} />
+                    </th>
                     {([
                       ['Data', 'date'],
                       ['Descrição', 'description'],
+                      ['Origem', 'source'],
                       ['Quem pagou', 'payer'],
                       ['Categoria', 'category'],
                       ['Quem arca', 'splitType'],
@@ -244,19 +343,29 @@ export function ExpensesView({ summary, rules, onDataChange }: ExpensesViewProps
                   </tr>
                 </thead>
                 <tbody>
-                  {sorted.map(item => (
-                    <tr key={item.id} style={{ borderTop: '1px solid var(--orc-border)', transition: 'background 0.1s' }}
-                      onMouseEnter={e => e.currentTarget.querySelectorAll('td').forEach(td => (td.style.background = 'var(--orc-bg)'))}
-                      onMouseLeave={e => e.currentTarget.querySelectorAll('td').forEach(td => (td.style.background = ''))}>
-                      <td style={{ padding: '10px 16px', fontSize: 13, color: 'var(--orc-text-2)', whiteSpace: 'nowrap' }}>{fmtDate(item.date)}</td>
-                      <td style={{ padding: '10px 16px', fontSize: 14, fontWeight: 500 }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-                          {item.description}
-                          {item.source === 'recurring' && <RecurringBadge />}
-                          {item.source === 'csv' && <CSVBadge />}
-                        </div>
-                        {item.source === 'installment' && <div style={{ fontSize: 11, color: 'var(--orc-text-3)' }}>Parcelado</div>}
+                  {sorted.map(item => {
+                    const checked = selectedIds.has(item.id);
+                    const canSelect = isBulkDeletable(item);
+                    return (
+                    <tr key={item.id}
+                      style={{
+                        borderTop: '1px solid var(--orc-border)',
+                        transition: 'background 0.1s',
+                        background: checked ? 'oklch(94% 0.05 238 / 0.4)' : undefined,
+                      }}>
+                      <td style={{ padding: '10px 8px 10px 16px' }}>
+                        {canSelect && (
+                          <input
+                            type="checkbox"
+                            aria-label="Selecionar lançamento"
+                            checked={checked}
+                            onChange={() => toggleSelect(item.id)}
+                            style={{ width: 16, height: 16, cursor: 'pointer', accentColor: 'var(--orc-accent)' }} />
+                        )}
                       </td>
+                      <td style={{ padding: '10px 16px', fontSize: 13, color: 'var(--orc-text-2)', whiteSpace: 'nowrap' }}>{fmtDate(item.date)}</td>
+                      <td style={{ padding: '10px 16px', fontSize: 14, fontWeight: 500 }}>{item.description}</td>
+                      <td style={{ padding: '10px 16px' }}><SourcePill source={item.source} /></td>
                       <td style={{ padding: '10px 16px' }}><PersonBadge person={item.payer} /></td>
                       <td style={{ padding: '10px 16px' }}><CatBadge cat={item.category} /></td>
                       <td style={{ padding: '10px 16px' }}><SplitBadge splitType={item.splitType} /></td>
@@ -288,7 +397,8 @@ export function ExpensesView({ summary, rules, onDataChange }: ExpensesViewProps
                           title="Remover">×</button>
                       </td>
                     </tr>
-                  ))}
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
@@ -297,24 +407,33 @@ export function ExpensesView({ summary, rules, onDataChange }: ExpensesViewProps
             <div className="orc-only-mobile">
               {sorted.map(item => {
                 const debt = computeItemDebt(item);
+                const checked = selectedIds.has(item.id);
+                const canSelect = isBulkDeletable(item);
                 return (
-                  <div key={item.id} style={{ padding: '14px 14px 12px', borderTop: '1px solid var(--orc-border)' }}>
+                  <div key={item.id} style={{
+                    padding: '14px 14px 12px', borderTop: '1px solid var(--orc-border)',
+                    background: checked ? 'oklch(94% 0.05 238 / 0.4)' : undefined,
+                  }}>
                     <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8, marginBottom: 6 }}>
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ fontSize: 11, color: 'var(--orc-text-3)', marginBottom: 2 }}>{fmtDate(item.date)}</div>
-                        <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--orc-text)', wordBreak: 'break-word' }}>{item.description}</div>
+                      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, flex: 1, minWidth: 0 }}>
+                        {canSelect && (
+                          <input type="checkbox" aria-label="Selecionar"
+                            checked={checked}
+                            onChange={() => toggleSelect(item.id)}
+                            style={{ width: 18, height: 18, marginTop: 2, cursor: 'pointer', accentColor: 'var(--orc-accent)' }} />
+                        )}
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontSize: 11, color: 'var(--orc-text-3)', marginBottom: 2 }}>{fmtDate(item.date)}</div>
+                          <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--orc-text)', wordBreak: 'break-word' }}>{item.description}</div>
+                        </div>
                       </div>
                       <div style={{ fontSize: 16, fontWeight: 700, whiteSpace: 'nowrap' }}>{fmt(item.value)}</div>
                     </div>
                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 10 }}>
+                      <SourcePill source={item.source} />
                       <PersonBadge person={item.payer} />
                       <CatBadge cat={item.category} />
                       <SplitBadge splitType={item.splitType} />
-                      {item.source === 'recurring' && <RecurringBadge />}
-                      {item.source === 'csv' && <CSVBadge />}
-                      {item.source === 'installment' && (
-                        <span style={{ display: 'inline-block', borderRadius: 100, background: '#E8F0FF', color: '#3A7BC8', fontWeight: 600, fontSize: 10, padding: '2px 7px', letterSpacing: '0.03em' }}>Parcelado</span>
-                      )}
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderTop: '1px solid var(--orc-border)', paddingTop: 10 }}>
                       <div style={{ fontSize: 12, color: 'var(--orc-text-2)' }}>
