@@ -1,6 +1,6 @@
 export type Person = 'barbara' | 'felipe';
 export type SplitType = '50/50' | 'barbara' | 'felipe' | string;
-export type ExpenseSource = 'manual' | 'csv' | 'installment' | 'recurring';
+export type ExpenseSource = 'manual' | 'csv' | 'installment' | 'recurring' | 'whatsapp';
 
 export interface Expense {
   id: string;
