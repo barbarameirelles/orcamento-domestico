@@ -1,0 +1,18 @@
+{
+  "name": "orcamento-whatsapp-bot",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Le mensagens do grupo do WhatsApp e cadastra gastos no Supabase do orcamento-domestico",
+  "scripts": {
+    "start": "node src/index.js"
+  },
+  "dependencies": {
+    "@hapi/boom": "^10.0.1",
+    "@supabase/supabase-js": "^2.105.1",
+    "@whiskeysockets/baileys": "^6.7.9",
+    "dotenv": "^16.4.5",
+    "pino": "^9.5.0",
+    "qrcode-terminal": "^0.12.0"
+  }
+}

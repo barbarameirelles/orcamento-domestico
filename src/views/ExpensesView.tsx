@@ -23,6 +23,7 @@ const SOURCE_LABEL: Record<ExpenseSource, string> = {
   csv: 'Cartão',
   installment: 'Parcelado',
   recurring: 'Fixo',
+  whatsapp: 'WhatsApp',
 };
 
 const SOURCE_STYLE: Record<ExpenseSource, { bg: string; color: string }> = {
@@ -30,6 +31,7 @@ const SOURCE_STYLE: Record<ExpenseSource, { bg: string; color: string }> = {
   csv: { bg: '#E8E0F5', color: '#6A4FB5' },
   installment: { bg: '#E8F0FF', color: '#3A7BC8' },
   recurring: { bg: '#FFF3CD', color: '#9A6B00' },
+  whatsapp: { bg: '#E1F3E7', color: '#1F8A4C' },
 };
 
 function SourcePill({ source }: { source: ExpenseSource }) {

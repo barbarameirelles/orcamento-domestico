@@ -13,7 +13,7 @@ const DEFAULT_RECURRING: RecurringExpense[] = [
   { id: 'fixed_saude', description: 'Plano de Saúde', payer: 'barbara', startDate: '2026-01-01', value: 700, category: 'Saúde', splitType: 'barbara', createdAt: '2026-01-01T00:00:00.000Z' },
 ];
 
-export const CATEGORIES = ['Moradia', 'Alimentação', 'Lazer', 'Assinaturas', 'Pets', 'Saúde', 'Outros'] as const;
+export const CATEGORIES = ['Moradia', 'Alimentação', 'Lazer', 'Assinaturas', 'Pets', 'Saúde', 'Carro', 'Outros'] as const;
 
 export const CAT_COLORS: Record<string, string> = {
   Moradia: '#5B8DB8',
@@ -22,6 +22,7 @@ export const CAT_COLORS: Record<string, string> = {
   Assinaturas: '#3A8A7A',
   Pets: '#6A9E6A',
   Saúde: '#D4707A',
+  Carro: '#7A8290',
   Outros: '#9E7070',
 };
 
@@ -32,6 +33,7 @@ export const DEFAULT_RULES: CategoryRules = {
   Assinaturas: '50/50',
   Pets: '50/50',
   Saúde: '50/50',
+  Carro: '50/50',
   Outros: '50/50',
 };
 
@@ -433,11 +435,12 @@ export function computeItemDebt(item: { value: number; splitType: SplitType; pay
 }
 
 export function inferCategory(description: string): string {
-  const d = description.toLowerCase();
+  // minúsculas + remove acentos, pra casar "farmácia" com a regra "farmacia" etc.
+  const d = description.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
   if (/pet\s?love|petz|cobasi|pet\s?shop/.test(d)) return 'Pets';
   if (/drogasil|drogaria|raia\d|\braia\b|farmacia|extra ?farma|rd\s?saude|clinica|hospital|laborat|duxnutrition|performancenu|afeet|care\s?club|\bsaude\b|nutrition/.test(d)) return 'Saúde';
   if (/spotify|netflix|apple\.?com|applecom|claro\s?tv|amazon ad|\bprime\b|openai|chatgpt|anthropic|claude\.ai|disney\+|hbo|globoplay|crewapp/.test(d)) return 'Assinaturas';
-  if (/ifd\*|ifood|uber\s?eats|\bpizz|restaur|\bcafe|botanikafe|boteco|bistro|cheesecake|navarro|sapore|koa\s?food|madaling|insalata|helix|priazzo|amor\s?in\s?pani|bonete|santigusta|carrefour|\bextra\s|pao de a|supermerc|mercado|padaria|hortif|sorvet|burguer|burger|sushi|temaki|companhia brasi|liv\s?up|gpc comercio|nespresso|agua de coco/.test(d)) return 'Alimentação';
+  if (/ifd\*|ifood|uber\s?eats|\bpizz|restaur|\bcafe|botanikafe|boteco|bistro|cheesecake|navarro|sapore|koa\s?food|madaling|insalata|helix|priazzo|amor\s?in\s?pani|bonete|santigusta|carrefour|\bextra\s|pao de a|supermerc|mercado|\bfeira\b|padaria|hortif|sorvet|burguer|burger|sushi|temaki|companhia brasi|liv\s?up|gpc comercio|nespresso|agua de coco/.test(d)) return 'Alimentação';
   if (/hotel|booking|airbnb|gol linhas|latam|azul linhas|smiles|cinema|ingresso|teatro|festival|parque|disney|universal|tickets|eventim|playstation|steam|nintendo|centauro|iguanasports|laviesports|\bsports?\b/.test(d)) return 'Lazer';
   if (/iptu|condom|aluguel|enel|cpfl|sabesp|comgas|energia|internet|vivo fibra|claro fibra|leroy|merlin|telhanorte/.test(d)) return 'Moradia';
   return 'Outros';
