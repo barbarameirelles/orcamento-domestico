@@ -20,6 +20,7 @@ const DEFAULT_RULES = {
   Assinaturas: '50/50',
   Pets: '50/50',
   Saúde: '50/50',
+  Carro: '50/50',
   Outros: '50/50',
 };
 
