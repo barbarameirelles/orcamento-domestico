@@ -13,7 +13,7 @@ const DEFAULT_RECURRING: RecurringExpense[] = [
   { id: 'fixed_saude', description: 'Plano de Saúde', payer: 'barbara', startDate: '2026-01-01', value: 700, category: 'Saúde', splitType: 'barbara', createdAt: '2026-01-01T00:00:00.000Z' },
 ];
 
-export const CATEGORIES = ['Moradia', 'Alimentação', 'Lazer', 'Assinaturas', 'Pets', 'Saúde', 'Outros'] as const;
+export const CATEGORIES = ['Moradia', 'Alimentação', 'Lazer', 'Assinaturas', 'Pets', 'Saúde', 'Carro', 'Outros'] as const;
 
 export const CAT_COLORS: Record<string, string> = {
   Moradia: '#5B8DB8',
@@ -22,6 +22,7 @@ export const CAT_COLORS: Record<string, string> = {
   Assinaturas: '#3A8A7A',
   Pets: '#6A9E6A',
   Saúde: '#D4707A',
+  Carro: '#7A8290',
   Outros: '#9E7070',
 };
 
@@ -32,6 +33,7 @@ export const DEFAULT_RULES: CategoryRules = {
   Assinaturas: '50/50',
   Pets: '50/50',
   Saúde: '50/50',
+  Carro: '50/50',
   Outros: '50/50',
 };
 
